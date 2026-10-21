@@ -1,6 +1,6 @@
-# BRATS-3D-U-Net-GAN
+# BRATS-3D-UNet-GAN
 
-[![CI](https://github.com/Bilalkhanten/BRATS-3D-U-Net-GAN/actions/workflows/ci.yml/badge.svg)](https://github.com/Bilalkhanten/BRATS-3D-U-Net-GAN/actions/workflows/ci.yml)
+[![CI](https://github.com/Bilalkhanten/BRATS-3D-UNet-GAN/actions/workflows/ci.yml/badge.svg)](https://github.com/Bilalkhanten/BRATS-3D-UNet-GAN/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -31,8 +31,8 @@ experiment configurations, the statistical analysis and the generator of the the
 ## Installation
 
 ```bash
-git clone https://github.com/Bilalkhanten/BRATS-3D-U-Net-GAN.git
-cd BRATS-3D-U-Net-GAN
+git clone https://github.com/Bilalkhanten/BRATS-3D-UNet-GAN.git
+cd BRATS-3D-UNet-GAN
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```

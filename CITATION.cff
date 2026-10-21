@@ -7,7 +7,7 @@ authors:
   - family-names: Khan
     given-names: Muhammad Bilal
 license: MIT
-repository-code: "https://github.com/Bilalkhanten/BRATS-3D-U-Net-GAN"
+repository-code: "https://github.com/Bilalkhanten/BRATS-3D-UNet-GAN"
 keywords:
   - brain tumour segmentation
   - BraTS
