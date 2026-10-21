@@ -9,11 +9,6 @@ tumour core, enhancing tumour) and **LGG/HGG grade classification** from the pre
 PhD thesis *3D Brain Tumor Segmentation and Grade Classification with 3D U-Net and GANs* and contains the complete pipeline, the
 experiment configurations, the statistical analysis and the generator of the thesis document.
 
-> **Status.** No BraTS result is included. The data cannot be redistributed and the GPU runs must be performed by the user
-> ([`RUNBOOK.md`](RUNBOOK.md)). Everything that *is* included was verified on synthetic data: unit tests, analytical/numerical
-> verification, and phantom studies. These show that the code works; they are not evidence about accuracy on patient data
-> (see [docs/reproducibility.md](docs/reproducibility.md)).
-
 ## Features
 
 * **Configurable 3D U-Net** with residual blocks, additive attention gates, a modality-attentive fusion (MAF) stem and deep
