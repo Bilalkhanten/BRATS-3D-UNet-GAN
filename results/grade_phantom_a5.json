@@ -1,0 +1,178 @@
+{
+  "pred_logreg": {
+    "cv": {
+      "n": 80,
+      "tp": 60,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "accuracy": 1.0,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "balanced_accuracy": 1.0,
+      "auc": 1.0,
+      "auc_ci": [
+        1.0,
+        1.0
+      ],
+      "accuracy_ci": [
+        1.0,
+        1.0
+      ]
+    },
+    "test": {
+      "n": 20,
+      "tp": 15,
+      "tn": 5,
+      "fp": 0,
+      "fn": 0,
+      "accuracy": 1.0,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "balanced_accuracy": 1.0,
+      "auc": 1.0,
+      "auc_ci": [
+        1.0,
+        1.0
+      ],
+      "accuracy_ci": [
+        1.0,
+        1.0
+      ]
+    },
+    "cv_ece": 0.10379127854226505,
+    "test_ece": 0.07960659636984392
+  },
+  "pred_gboost": {
+    "cv": {
+      "n": 80,
+      "tp": 60,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "accuracy": 1.0,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "balanced_accuracy": 1.0,
+      "auc": 1.0,
+      "auc_ci": [
+        1.0,
+        1.0
+      ],
+      "accuracy_ci": [
+        1.0,
+        1.0
+      ]
+    },
+    "test": {
+      "n": 20,
+      "tp": 15,
+      "tn": 5,
+      "fp": 0,
+      "fn": 0,
+      "accuracy": 1.0,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "balanced_accuracy": 1.0,
+      "auc": 1.0,
+      "auc_ci": [
+        1.0,
+        1.0
+      ],
+      "accuracy_ci": [
+        1.0,
+        1.0
+      ]
+    },
+    "cv_ece": 0.0037412056476573336,
+    "test_ece": 2.4649501398367403e-05
+  },
+  "gt_logreg": {
+    "cv": {
+      "n": 80,
+      "tp": 60,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "accuracy": 1.0,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "balanced_accuracy": 1.0,
+      "auc": 1.0,
+      "auc_ci": [
+        1.0,
+        1.0
+      ],
+      "accuracy_ci": [
+        1.0,
+        1.0
+      ]
+    },
+    "test": {
+      "n": 20,
+      "tp": 15,
+      "tn": 5,
+      "fp": 0,
+      "fn": 0,
+      "accuracy": 1.0,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "balanced_accuracy": 1.0,
+      "auc": 1.0,
+      "auc_ci": [
+        1.0,
+        1.0
+      ],
+      "accuracy_ci": [
+        1.0,
+        1.0
+      ]
+    },
+    "cv_ece": 0.10112538886938188,
+    "test_ece": 0.07779538257456756
+  },
+  "gt_gboost": {
+    "cv": {
+      "n": 80,
+      "tp": 60,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "accuracy": 1.0,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "balanced_accuracy": 1.0,
+      "auc": 1.0,
+      "auc_ci": [
+        1.0,
+        1.0
+      ],
+      "accuracy_ci": [
+        1.0,
+        1.0
+      ]
+    },
+    "test": {
+      "n": 20,
+      "tp": 15,
+      "tn": 5,
+      "fp": 0,
+      "fn": 0,
+      "accuracy": 1.0,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "balanced_accuracy": 1.0,
+      "auc": 1.0,
+      "auc_ci": [
+        1.0,
+        1.0
+      ],
+      "accuracy_ci": [
+        1.0,
+        1.0
+      ]
+    },
+    "cv_ece": 0.0020227108292480388,
+    "test_ece": 2.4649501398367403e-05
+  }
+}

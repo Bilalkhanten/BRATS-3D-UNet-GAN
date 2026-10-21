@@ -1,0 +1,7 @@
+{
+  "name": "g_nosmooth",
+  "gan": true,
+  "w_tv": 1.0,
+  "real_smooth": 0.0,
+  "d_noise": 0.0
+}

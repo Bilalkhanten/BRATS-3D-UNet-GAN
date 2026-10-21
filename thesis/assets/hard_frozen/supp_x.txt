@@ -1,0 +1,385 @@
+@appendix[hard-supp] Supplementary Results of the Hard Synthetic Benchmark
+
+This appendix collects the complete tables and figures behind Section @sec:hard. All values are computed from the run directories of the hard benchmark (160 synthetic phantoms; 32 test phantoms of fold 0; 128 development phantoms in three folds) by the same code that produced the chapter; none of them is a result on BraTS. Phantoms are identified by the last three digits of their case number.
+
+@section[x-pp] Per-Phantom Dice of the Variants
+
+@tab:x-pp lists the mean Dice score over the three regions of every variant on every one of the 32 test phantoms of fold 0, sorted by the volume of the whole tumour (average over the two seeds). The table is the raw material of the paired statistics of @tab:hd-steps; it also shows the dependence on lesion size that Section @sec:hd-dist analyses.
+
+@tab x-pp | widths=0.6,0.6,1.0,0.7,0.7,0.7,0.7,0.7,0.7 | align=cccrcccccc | size=8
+Mean Dice (WT, TC, ET) of the six variants on each test phantom, sorted by the whole-tumour volume (voxels).
+| Phantom | Grade | WT volume | A0 | A1 | A2 | A3 | A4 | A5 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 151 | LGG | 189 | 0.547 | 0.560 | 0.524 | 0.567 | 0.586 | 0.572 |
+| 089 | HGG | 290 | 0.688 | 0.754 | 0.747 | 0.728 | 0.737 | 0.732 |
+| 021 | HGG | 302 | 0.730 | 0.789 | 0.785 | 0.759 | 0.757 | 0.737 |
+| 057 | HGG | 464 | 0.777 | 0.785 | 0.757 | 0.767 | 0.791 | 0.782 |
+| 056 | HGG | 482 | 0.797 | 0.829 | 0.851 | 0.792 | 0.840 | 0.835 |
+| 115 | HGG | 518 | 0.787 | 0.776 | 0.808 | 0.763 | 0.782 | 0.764 |
+| 094 | HGG | 542 | 0.748 | 0.804 | 0.822 | 0.795 | 0.759 | 0.787 |
+| 038 | HGG | 557 | 0.694 | 0.693 | 0.675 | 0.689 | 0.659 | 0.660 |
+| 150 | LGG | 582 | 0.615 | 0.631 | 0.624 | 0.623 | 0.624 | 0.618 |
+| 072 | HGG | 603 | 0.781 | 0.798 | 0.844 | 0.798 | 0.810 | 0.808 |
+| 003 | HGG | 607 | 0.727 | 0.704 | 0.693 | 0.709 | 0.706 | 0.712 |
+| 090 | HGG | 629 | 0.783 | 0.787 | 0.815 | 0.744 | 0.776 | 0.764 |
+| 085 | HGG | 649 | 0.733 | 0.756 | 0.754 | 0.726 | 0.749 | 0.749 |
+| 114 | HGG | 657 | 0.770 | 0.803 | 0.825 | 0.784 | 0.816 | 0.805 |
+| 126 | LGG | 676 | 0.598 | 0.604 | 0.602 | 0.602 | 0.597 | 0.598 |
+| 026 | HGG | 707 | 0.795 | 0.801 | 0.820 | 0.792 | 0.837 | 0.832 |
+| 046 | HGG | 709 | 0.661 | 0.648 | 0.708 | 0.648 | 0.678 | 0.681 |
+| 106 | HGG | 723 | 0.795 | 0.826 | 0.835 | 0.783 | 0.854 | 0.854 |
+| 128 | LGG | 756 | 0.586 | 0.600 | 0.585 | 0.595 | 0.596 | 0.596 |
+| 083 | HGG | 774 | 0.749 | 0.769 | 0.791 | 0.752 | 0.781 | 0.776 |
+| 047 | HGG | 803 | 0.723 | 0.679 | 0.699 | 0.681 | 0.731 | 0.737 |
+| 019 | HGG | 833 | 0.817 | 0.797 | 0.819 | 0.806 | 0.850 | 0.840 |
+| 156 | LGG | 833 | 0.620 | 0.636 | 0.622 | 0.633 | 0.621 | 0.617 |
+| 144 | LGG | 836 | 0.623 | 0.638 | 0.627 | 0.642 | 0.622 | 0.622 |
+| 004 | HGG | 855 | 0.778 | 0.778 | 0.819 | 0.777 | 0.824 | 0.812 |
+| 025 | HGG | 906 | 0.754 | 0.766 | 0.776 | 0.747 | 0.764 | 0.762 |
+| 079 | HGG | 906 | 0.802 | 0.786 | 0.820 | 0.780 | 0.843 | 0.821 |
+| 129 | LGG | 935 | 0.636 | 0.636 | 0.613 | 0.638 | 0.625 | 0.629 |
+| 093 | HGG | 936 | 0.821 | 0.825 | 0.853 | 0.830 | 0.881 | 0.871 |
+| 127 | LGG | 1,300 | 0.608 | 0.605 | 0.600 | 0.602 | 0.613 | 0.611 |
+| 001 | HGG | 1,557 | 0.787 | 0.770 | 0.819 | 0.769 | 0.811 | 0.804 |
+| 070 | HGG | 1,816 | 0.730 | 0.688 | 0.694 | 0.717 | 0.703 | 0.729 |
+@end
+
+@tab:x-grade gives the Dice scores by grade. The LGG-like phantoms (8 of 32) have little or no enhancing tumour, so that their ET score is not comparable with that of the HGG-like phantoms (24); the empty-mask convention of Chapter 3 applies to them.
+
+@tab x-grade | widths=0.8,0.75,0.75,0.75,0.75,0.75,0.75 | align=lcccccc | size=8.5
+Mean Dice per region by grade of the phantom (test set, fold 0, two seeds).
+| Variant | HGG WT | HGG TC | HGG ET | LGG WT | LGG TC | LGG ET |
+| --- | --- | --- | --- | --- | --- | --- |
+| A0 | 0.902 | 0.858 | 0.519 | 0.894 | 0.882 | 0.036 |
+| A1 | 0.914 | 0.869 | 0.519 | 0.908 | 0.895 | 0.039 |
+| A2 | 0.911 | 0.866 | 0.576 | 0.902 | 0.876 | 0.020 |
+| A3 | 0.906 | 0.856 | 0.505 | 0.911 | 0.889 | 0.039 |
+| A4 | 0.909 | 0.861 | 0.572 | 0.922 | 0.887 | 0.022 |
+| A5 | 0.908 | 0.858 | 0.566 | 0.916 | 0.885 | 0.022 |
+@end
+
+@section[x-oof] Out-of-Fold Scores of the Development Phantoms
+
+Every development phantom is segmented by the model of the fold that did not train on it. @tab:x-oof gives the out-of-fold mean Dice of A0 and A5 for all 128 phantoms (seed 1); the pooled difference of the two networks is the one reported in Section @sec:hd-cv.
+
+@tab x-oof | widths=0.55,0.4,0.5,0.55,0.55,0.55,0.4,0.5,0.55,0.55 | align=cccccccccc | size=7.5
+Out-of-fold mean Dice of A0 and A5 for the development phantoms (seed 1); fold of the phantom and grade.
+| Phantom | Fold | Grade | A0 | A5 | Phantom | Fold | Grade | A0 | A5 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 002 | 2 | HGG | 0.820 | 0.792 | 080 | 2 | HGG | 0.811 | 0.802 |
+| 005 | 1 | HGG | 0.715 | 0.750 | 081 | 2 | HGG | 0.803 | 0.725 |
+| 006 | 0 | HGG | 0.674 | 0.698 | 082 | 2 | HGG | 0.764 | 0.801 |
+| 007 | 0 | HGG | 0.708 | 0.657 | 084 | 2 | HGG | 0.756 | 0.834 |
+| 008 | 2 | HGG | 0.802 | 0.802 | 086 | 1 | HGG | 0.763 | 0.744 |
+| 009 | 2 | HGG | 0.762 | 0.735 | 087 | 2 | HGG | 0.800 | 0.824 |
+| 010 | 2 | HGG | 0.760 | 0.741 | 088 | 1 | HGG | 0.774 | 0.738 |
+| 011 | 0 | HGG | 0.686 | 0.615 | 091 | 2 | HGG | 0.789 | 0.784 |
+| 012 | 2 | HGG | 0.756 | 0.800 | 092 | 0 | HGG | 0.754 | 0.841 |
+| 013 | 1 | HGG | 0.817 | 0.850 | 095 | 1 | HGG | 0.787 | 0.730 |
+| 014 | 2 | HGG | 0.729 | 0.753 | 096 | 1 | HGG | 0.736 | 0.752 |
+| 015 | 1 | HGG | 0.770 | 0.717 | 097 | 1 | HGG | 0.736 | 0.704 |
+| 016 | 2 | HGG | 0.793 | 0.799 | 098 | 2 | HGG | 0.602 | 0.590 |
+| 017 | 0 | HGG | 0.823 | 0.835 | 099 | 0 | HGG | 0.742 | 0.824 |
+| 018 | 2 | HGG | 0.785 | 0.803 | 100 | 2 | HGG | 0.725 | 0.723 |
+| 020 | 0 | HGG | 0.649 | 0.697 | 101 | 2 | HGG | 0.768 | 0.710 |
+| 022 | 1 | HGG | 0.710 | 0.602 | 102 | 0 | HGG | 0.710 | 0.794 |
+| 023 | 2 | HGG | 0.795 | 0.675 | 103 | 1 | HGG | 0.793 | 0.738 |
+| 024 | 2 | HGG | 0.769 | 0.775 | 104 | 0 | HGG | 0.732 | 0.760 |
+| 027 | 2 | HGG | 0.755 | 0.765 | 105 | 1 | HGG | 0.731 | 0.723 |
+| 028 | 0 | HGG | 0.809 | 0.839 | 107 | 2 | HGG | 0.796 | 0.814 |
+| 029 | 0 | HGG | 0.781 | 0.763 | 108 | 0 | HGG | 0.771 | 0.835 |
+| 030 | 1 | HGG | 0.769 | 0.804 | 109 | 1 | HGG | 0.764 | 0.765 |
+| 031 | 2 | HGG | 0.751 | 0.769 | 110 | 0 | HGG | 0.800 | 0.759 |
+| 032 | 1 | HGG | 0.680 | 0.733 | 111 | 2 | HGG | 0.769 | 0.769 |
+| 033 | 1 | HGG | 0.722 | 0.738 | 112 | 2 | HGG | 0.748 | 0.808 |
+| 034 | 1 | HGG | 0.812 | 0.831 | 113 | 1 | HGG | 0.748 | 0.726 |
+| 035 | 1 | HGG | 0.765 | 0.513 | 116 | 0 | HGG | 0.830 | 0.875 |
+| 036 | 1 | HGG | 0.834 | 0.826 | 117 | 0 | HGG | 0.776 | 0.835 |
+| 037 | 1 | HGG | 0.720 | 0.760 | 118 | 0 | HGG | 0.699 | 0.759 |
+| 039 | 2 | HGG | 0.707 | 0.774 | 119 | 0 | HGG | 0.810 | 0.833 |
+| 040 | 0 | HGG | 0.726 | 0.705 | 120 | 0 | HGG | 0.802 | 0.810 |
+| 041 | 2 | HGG | 0.780 | 0.793 | 121 | 0 | LGG | 0.582 | 0.573 |
+| 042 | 1 | HGG | 0.690 | 0.591 | 122 | 2 | LGG | 0.571 | 0.556 |
+| 043 | 1 | HGG | 0.766 | 0.756 | 123 | 2 | LGG | 0.557 | 0.544 |
+| 044 | 2 | HGG | 0.742 | 0.807 | 124 | 1 | LGG | 0.621 | 0.609 |
+| 045 | 1 | HGG | 0.716 | 0.724 | 125 | 0 | LGG | 0.564 | 0.556 |
+| 048 | 0 | HGG | 0.789 | 0.851 | 130 | 1 | LGG | 0.604 | 0.631 |
+| 049 | 0 | HGG | 0.755 | 0.812 | 131 | 1 | LGG | 0.616 | 0.610 |
+| 050 | 2 | HGG | 0.797 | 0.814 | 132 | 0 | LGG | 0.575 | 0.581 |
+| 051 | 1 | HGG | 0.769 | 0.752 | 133 | 2 | LGG | 0.552 | 0.560 |
+| 052 | 0 | HGG | 0.767 | 0.745 | 134 | 1 | LGG | 0.555 | 0.584 |
+| 053 | 2 | HGG | 0.778 | 0.794 | 135 | 0 | LGG | 0.632 | 0.612 |
+| 054 | 2 | HGG | 0.792 | 0.746 | 136 | 2 | LGG | 0.595 | 0.575 |
+| 055 | 1 | HGG | 0.668 | 0.689 | 137 | 0 | LGG | 0.617 | 0.617 |
+| 058 | 0 | HGG | 0.722 | 0.682 | 138 | 1 | LGG | 0.608 | 0.605 |
+| 059 | 0 | HGG | 0.775 | 0.794 | 139 | 0 | LGG | 0.615 | 0.616 |
+| 060 | 0 | HGG | 0.734 | 0.789 | 140 | 0 | LGG | 0.501 | 0.499 |
+| 061 | 1 | HGG | 0.754 | 0.698 | 141 | 0 | LGG | 0.601 | 0.545 |
+| 062 | 2 | HGG | 0.749 | 0.775 | 142 | 1 | LGG | 0.560 | 0.596 |
+| 063 | 0 | HGG | 0.762 | 0.783 | 143 | 2 | LGG | 0.555 | 0.593 |
+| 064 | 1 | HGG | 0.738 | 0.652 | 145 | 1 | LGG | 0.586 | 0.594 |
+| 065 | 2 | HGG | 0.670 | 0.788 | 146 | 1 | LGG | 0.605 | 0.622 |
+| 066 | 0 | HGG | 0.727 | 0.837 | 147 | 2 | LGG | 0.630 | 0.609 |
+| 067 | 0 | HGG | 0.776 | 0.825 | 148 | 2 | LGG | 0.620 | 0.621 |
+| 068 | 0 | HGG | 0.717 | 0.742 | 149 | 1 | LGG | 0.597 | 0.601 |
+| 069 | 0 | HGG | 0.674 | 0.701 | 152 | 0 | LGG | 0.571 | 0.575 |
+| 071 | 1 | HGG | 0.752 | 0.764 | 153 | 2 | LGG | 0.568 | 0.537 |
+| 073 | 1 | HGG | 0.611 | 0.632 | 154 | 2 | LGG | 0.594 | 0.596 |
+| 074 | 0 | HGG | 0.806 | 0.832 | 155 | 2 | LGG | 0.581 | 0.585 |
+| 075 | 1 | HGG | 0.754 | 0.725 | 157 | 0 | LGG | 0.577 | 0.590 |
+| 076 | 1 | HGG | 0.735 | 0.790 | 158 | 1 | LGG | 0.616 | 0.600 |
+| 077 | 0 | HGG | 0.713 | 0.747 | 159 | 1 | LGG | 0.660 | 0.652 |
+| 078 | 1 | HGG | 0.773 | 0.836 | 160 | 0 | LGG | 0.583 | 0.576 |
+@end
+
+@fig x-oof | file={FIGDIR}/x_oof.png | width=6.2
+Distribution of the per-phantom difference A5 minus A0 in out-of-fold mean Dice: (a) all 128 development phantoms, (b) by fold.
+@end
+
+The distribution in @fig:x-oof(a) has a mean of +0.0045 and a standard deviation of 0.047, i.e. 11 times the mean, (the 95% bootstrap interval of the mean, [-0.0039, +0.0125], includes zero); the boxes of panel (b) show that the three folds differ in the position of the median (+0.021, -0.003, +0.005).
+
+@section[x-gal] Remaining Test Phantoms
+
+The gallery of Section @sec:hd-gal shows 14 of the 32 test phantoms. @fig:x-gal1 to @fig:x-gal5 show the remaining 18 in the order of decreasing mean Dice of A5, so that the complete test set can be inspected, and @tab:x-gal gives their volumes and scores.
+
+@fig x-gal1 | file={FIGDIR}/x_gal1.png | width=6.4
+Remaining test phantoms, part 1 of 5 (sorted by decreasing mean Dice of A5): T1ce, FLAIR, reference, detection of A5 and error map in the central axial slice through the tumour. Colours as in @fig:hd-g1.
+@end
+
+@fig x-gal2 | file={FIGDIR}/x_gal2.png | width=6.4
+Remaining test phantoms, part 2 of 5 (sorted by decreasing mean Dice of A5): T1ce, FLAIR, reference, detection of A5 and error map in the central axial slice through the tumour. Colours as in @fig:hd-g1.
+@end
+
+@fig x-gal3 | file={FIGDIR}/x_gal3.png | width=6.4
+Remaining test phantoms, part 3 of 5 (sorted by decreasing mean Dice of A5): T1ce, FLAIR, reference, detection of A5 and error map in the central axial slice through the tumour. Colours as in @fig:hd-g1.
+@end
+
+@fig x-gal4 | file={FIGDIR}/x_gal4.png | width=6.4
+Remaining test phantoms, part 4 of 5 (sorted by decreasing mean Dice of A5): T1ce, FLAIR, reference, detection of A5 and error map in the central axial slice through the tumour. Colours as in @fig:hd-g1.
+@end
+
+@fig x-gal5 | file={FIGDIR}/x_gal5.png | width=6.4
+Remaining test phantoms, part 5 of 5 (sorted by decreasing mean Dice of A5): T1ce, FLAIR, reference, detection of A5 and error map in the central axial slice through the tumour. Colours as in @fig:hd-g1.
+@end
+
+@tab x-gal | widths=0.5,0.7,0.6,1.0,0.8,0.8,0.8 | align=cccrccc | size=8.5
+Phantoms of @fig:x-gal1 to @fig:x-gal5: figure part, phantom, grade, whole-tumour volume (voxels) and Dice of A5 per region.
+| Part | Phantom | Grade | WT volume | Dice WT | Dice TC | Dice ET |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 056 | HGG | 482 | 0.920 | 0.932 | 0.654 |
+| 1 | 026 | HGG | 707 | 0.938 | 0.924 | 0.633 |
+| 1 | 079 | HGG | 906 | 0.955 | 0.911 | 0.597 |
+| 1 | 004 | HGG | 855 | 0.902 | 0.905 | 0.630 |
+| 2 | 072 | HGG | 603 | 0.932 | 0.874 | 0.618 |
+| 2 | 114 | HGG | 657 | 0.921 | 0.874 | 0.619 |
+| 2 | 057 | HGG | 464 | 0.882 | 0.868 | 0.596 |
+| 2 | 083 | HGG | 774 | 0.931 | 0.868 | 0.528 |
+| 3 | 090 | HGG | 629 | 0.920 | 0.833 | 0.540 |
+| 3 | 115 | HGG | 518 | 0.930 | 0.835 | 0.527 |
+| 3 | 047 | HGG | 803 | 0.935 | 0.842 | 0.433 |
+| 3 | 021 | HGG | 302 | 0.835 | 0.835 | 0.540 |
+| 4 | 003 | HGG | 607 | 0.865 | 0.765 | 0.504 |
+| 4 | 046 | HGG | 709 | 0.889 | 0.803 | 0.352 |
+| 4 | 038 | HGG | 557 | 0.906 | 0.703 | 0.371 |
+| 4 | 129 | LGG | 935 | 0.916 | 0.929 | 0.042 |
+| 5 | 127 | LGG | 1,300 | 0.928 | 0.904 | 0.000 |
+| 5 | 126 | LGG | 676 | 0.930 | 0.865 | 0.000 |
+@end
+
+@section[x-curves] Training Curves of All Runs
+
+@fig:x-cv-val and @fig:x-cv-loss show the validation Dice and the training loss of every one of the 18 runs on fold 0 (twelve configurations, two seeds where available). The scale of the loss differs between configurations because the Tversky and adversarial terms are added to it; only the shape is comparable.
+
+@fig x-cv-val | file={FIGDIR}/x_curves_val.png | width=6.4
+Validation Dice (mean over the three regions) against the epoch for all configurations of the hard benchmark (fold 0).
+@end
+
+@fig x-cv-loss | file={FIGDIR}/x_curves_loss.png | width=6.4
+Training loss of the generator against the epoch for all configurations of the hard benchmark (fold 0).
+@end
+
+@section[x-sec] Secondary Metrics by Variant
+
+@tab x-sens | widths=0.7,1.9,1.9,1.9 | align=lccc | size=8
+Sensitivity of the six variants per region on the test phantoms (mean over phantoms and seeds, 95% bootstrap interval).
+| Variant | WT | TC | ET |
+| --- | --- | --- | --- |
+| A0 | 0.883 [0.865, 0.900] | 0.912 [0.883, 0.936] | 0.736 [0.622, 0.837] |
+| A1 | 0.897 [0.876, 0.916] | 0.893 [0.862, 0.922] | 0.711 [0.596, 0.813] |
+| A2 | 0.905 [0.887, 0.922] | 0.886 [0.856, 0.914] | 0.627 [0.526, 0.718] |
+| A3 | 0.909 [0.891, 0.925] | 0.887 [0.855, 0.917] | 0.701 [0.588, 0.803] |
+| A4 | 0.921 [0.904, 0.936] | 0.910 [0.881, 0.936] | 0.663 [0.556, 0.762] |
+| A5 | 0.929 [0.913, 0.944] | 0.913 [0.885, 0.939] | 0.676 [0.567, 0.775] |
+@end
+
+@tab x-prec | widths=0.7,1.9,1.9,1.9 | align=lccc | size=8
+Precision of the six variants per region on the test phantoms (mean over phantoms and seeds, 95% bootstrap interval).
+| Variant | WT | TC | ET |
+| --- | --- | --- | --- |
+| A0 | 0.930 [0.901, 0.954] | 0.840 [0.805, 0.875] | 0.294 [0.235, 0.349] |
+| A1 | 0.936 [0.910, 0.957] | 0.873 [0.838, 0.905] | 0.300 [0.239, 0.357] |
+| A2 | 0.919 [0.892, 0.943] | 0.867 [0.830, 0.901] | 0.370 [0.291, 0.445] |
+| A3 | 0.914 [0.890, 0.935] | 0.860 [0.825, 0.894] | 0.291 [0.233, 0.346] |
+| A4 | 0.910 [0.887, 0.930] | 0.845 [0.807, 0.883] | 0.356 [0.279, 0.429] |
+| A5 | 0.898 [0.873, 0.920] | 0.837 [0.799, 0.875] | 0.343 [0.270, 0.412] |
+@end
+
+@tab x-hd95 | widths=0.7,1.9,1.9,1.9 | align=lccc | size=8
+HD95 (voxels) of the six variants per region on the test phantoms (mean over phantoms and seeds, 95% bootstrap interval).
+| Variant | WT | TC | ET |
+| --- | --- | --- | --- |
+| A0 | 1.39 [1.07, 1.98] | 1.05 [1.02, 1.09] | 47.94 [12.94, 94.42] |
+| A1 | 1.07 [1.01, 1.16] | 1.05 [1.01, 1.11] | 47.91 [12.92, 94.39] |
+| A2 | 1.08 [1.03, 1.16] | 1.05 [1.01, 1.11] | 47.93 [12.93, 94.41] |
+| A3 | 1.06 [1.02, 1.11] | 1.03 [1.01, 1.07] | 47.90 [12.91, 94.38] |
+| A4 | 1.06 [1.02, 1.12] | 1.04 [1.01, 1.08] | 47.92 [12.93, 94.40] |
+| A5 | 1.06 [1.02, 1.11] | 1.05 [1.01, 1.09] | 47.92 [12.93, 94.39] |
+@end
+
+@fig:x-secondary summarises the three metrics. For the enhancing tumour the sensitivity lies between 0.627 and 0.736 and the precision between 0.291 and 0.370 over the variants: the networks recover most of the reference volume and pay for it with a low precision, which is the same over-segmentation as in Section @sec:hd-tv. The HD95 of the enhancing tumour is dominated by the empty-mask penalty of Chapter 3: 4 to 4 of the 32 test phantoms have an HD95 above 100 voxels for ET depending on the variant (reference or prediction empty while the other is not), and these phantoms alone determine the mean.
+
+@fig x-secondary | file={FIGDIR}/x_secondary.png | width=6.4
+Sensitivity, precision and HD95 of the six variants for WT, TC and ET (test phantoms of fold 0, mean over phantoms and seeds).
+@end
+
+@section[x-pair] All Pairwise Comparisons
+
+@tab:x-pair gives the paired difference of the mean Dice for all 15 pairs of the six variants, with the Holm correction applied over the 15 comparisons (the chapter corrects over the five successive comparisons only). @fig:x-pair shows the differences as a matrix.
+
+@tab x-pair | widths=1.2,2.0,0.9,0.9,0.7 | align=lcccc | size=8
+Paired differences of the mean Dice between all pairs of variants (later minus earlier variant; 95% bootstrap interval; Wilcoxon p unadjusted and with Holm correction over the 15 comparisons; Cohen's $d_z$).
+| Comparison | $\Delta$ Dice [95% CI] | p | p (Holm) | $d_z$ |
+| --- | --- | --- | --- | --- |
+| A1 $-$ A0 | 0.008 [-0.001, 0.017] | 0.077 | 0.462 | 0.32 |
+| A2 $-$ A0 | 0.018 [0.007, 0.028] | 0.004 | 0.037 | 0.57 |
+| A3 $-$ A0 | -0.001 [-0.007, 0.006] | 0.733 | 1.000 | -0.03 |
+| A4 $-$ A0 | 0.018 [0.009, 0.026] | <0.001 | 0.007 | 0.72 |
+| A5 $-$ A0 | 0.014 [0.007, 0.022] | <0.001 | 0.010 | 0.65 |
+| A2 $-$ A1 | 0.009 [0.001, 0.018] | 0.048 | 0.333 | 0.39 |
+| A3 $-$ A1 | -0.009 [-0.015, -0.003] | 0.003 | 0.029 | -0.56 |
+| A4 $-$ A1 | 0.009 [0.000, 0.019] | 0.098 | 0.492 | 0.35 |
+| A5 $-$ A1 | 0.006 [-0.003, 0.015] | 0.278 | 1.000 | 0.23 |
+| A3 $-$ A2 | -0.018 [-0.028, -0.008] | 0.001 | 0.017 | -0.63 |
+| A4 $-$ A2 | -0.000 [-0.009, 0.008] | 0.919 | 1.000 | -0.00 |
+| A5 $-$ A2 | -0.003 [-0.012, 0.005] | 0.548 | 1.000 | -0.13 |
+| A4 $-$ A3 | 0.018 [0.009, 0.028] | 0.001 | 0.017 | 0.67 |
+| A5 $-$ A3 | 0.015 [0.007, 0.023] | 0.002 | 0.020 | 0.63 |
+| A5 $-$ A4 | -0.003 [-0.007, 0.001] | 0.019 | 0.156 | -0.30 |
+@end
+
+@fig x-pair | file={FIGDIR}/x_pairmat.png | width=3.9
+Matrix of the paired differences in mean Dice (row variant minus column variant) on the test phantoms.
+@end
+
+@section[x-ba] Agreement of A0 and A5 per Phantom
+
+@fig:x-ba (upper row) plots the Dice of A5 against that of A0 for every test phantom and (lower row) the differences against the means, with the mean difference and the limits of agreement (mean $\pm$ 1.96 standard deviations). @tab:x-ba lists the numbers. The half-width of the limits of agreement is 0.040, 0.038, 0.096 for WT, TC and ET, against mean differences of +0.010, +0.001, +0.032; the correlation between the scores of the two networks is 0.84, 0.94, 0.99. The two networks therefore rank the phantoms in nearly the same order, and the difference between them is small compared with the variation between phantoms.
+
+@fig x-ba | file={FIGDIR}/x_ba.png | width=6.4
+Agreement of A0 and A5 on the test phantoms: scatter plots of the Dice (upper row) and Bland--Altman plots (lower row) for WT, TC and ET.
+@end
+
+@tab x-ba | widths=1.0,1.2,2.0,1.2 | align=cccc | size=9
+Bland-Altman statistics of A5 against A0 (Dice, test phantoms): mean difference, limits of agreement and Pearson correlation.
+| Region | Mean difference | Limits of agreement | Correlation |
+| --- | --- | --- | --- |
+| WT | +0.0102 | [-0.030, +0.050] | 0.839 |
+| TC | +0.0007 | [-0.037, +0.039] | 0.944 |
+| ET | +0.0320 | [-0.064, +0.128] | 0.988 |
+@end
+
+@section[x-conf] Voxel Confusion Matrices
+
+@tab x-confa0 | widths=1.4,0.9,0.9,0.9,0.9,1.1 | align=lccccr | size=8.5
+Voxel confusion matrix of A0 on the test phantoms (rows: reference label, columns: predicted label, entries in per cent of the reference voxels; last column: number of reference voxels). The label map is obtained from the three regions with the hierarchy ET in TC in WT.
+| Reference | background | NCR | ED | ET | Voxels |
+| --- | --- | --- | --- | --- | --- |
+| background | 99.9 | 0.0 | 0.1 | 0.0 | 2,427,524 |
+| NCR (1) | 0.0 | 0.0 | 1.5 | 98.5 | 5,136 |
+| ED (2) | 16.9 | 0.0 | 70.9 | 12.2 | 15,380 |
+| ET (4) | 0.0 | 0.0 | 16.1 | 83.9 | 3,416 |
+@end
+
+@tab x-confa5 | widths=1.4,0.9,0.9,0.9,0.9,1.1 | align=lccccr | size=8.5
+Voxel confusion matrix of A5 on the test phantoms (rows: reference label, columns: predicted label, entries in per cent of the reference voxels; last column: number of reference voxels). The label map is obtained from the three regions with the hierarchy ET in TC in WT.
+| Reference | background | NCR | ED | ET | Voxels |
+| --- | --- | --- | --- | --- | --- |
+| background | 99.9 | 0.0 | 0.1 | 0.0 | 2,427,524 |
+| NCR (1) | 0.0 | 47.4 | 3.7 | 48.9 | 5,136 |
+| ED (2) | 12.2 | 0.0 | 79.0 | 8.7 | 15,380 |
+| ET (4) | 0.0 | 3.8 | 25.6 | 70.7 | 3,416 |
+@end
+
+@tab:x-confa0 and @tab:x-confa5 give the confusion between the four labels, and @fig:x-conf shows them as matrices. The enhancing tumour is recovered for 83.9% (A0) and 70.7% (A5) of its voxels; the remainder is assigned to the necrotic or non-enhancing core (0.0% and 3.8%) or to the oedema, so that the errors are confusions within the tumour more than losses to the background. A0 assigns the label of the necrotic and non-enhancing core to 0.0% of the reference voxels of that label and 98.5% of them to the enhancing tumour; A5 does so for 47.4% and 48.9%.
+
+@fig x-conf | file={FIGDIR}/x_conf.png | width=6.2
+Confusion matrices between the four labels (rows normalised) for A0 and A5 on the test phantoms.
+@end
+
+@section[x-cal] Calibration of All Variants
+
+@fig:x-cal and @tab:x-cal extend the calibration analysis of Section @sec:hd-calib from A0 and A5 to all six variants (test phantoms of fold 0, seed 1, ten equal-width bins over the brain voxels).
+
+@fig x-cal | file={FIGDIR}/x_cal.png | width=6.4
+Reliability diagrams of the six variants for WT, TC and ET (test phantoms, fold 0, seed 1).
+@end
+
+@tab x-cal | widths=1.0,1.1,1.1,1.1 | align=cccc | size=9
+Expected calibration error of the six variants per region.
+| Variant | WT | TC | ET |
+| --- | --- | --- | --- |
+| A0 | 0.0038 | 0.0024 | 0.0099 |
+| A1 | 0.0048 | 0.0023 | 0.0094 |
+| A2 | 0.0038 | 0.0022 | 0.0093 |
+| A3 | 0.0043 | 0.0021 | 0.0098 |
+| A4 | 0.0044 | 0.0025 | 0.0054 |
+| A5 | 0.0047 | 0.0026 | 0.0062 |
+@end
+
+@section[x-prob] Probability Maps of the Enhancing Tumour
+
+@fig:x-prob shows the predicted probability of the enhancing tumour of four networks on four HGG-like phantoms with large lesions (central axial slice; the white contour is the reference ET). On these phantoms the ratio of the number of voxels with a probability above 0.5 to the reference volume is 2.31 (A0), 2.22 (A3), 1.36 (A4), 1.51 (A5). A probability map that fills the whole lesion instead of the shell is the visible form of the over-segmentation analysed in Section @sec:hd-tv.
+
+@fig x-prob | file={FIGDIR}/x_prob.png | width=6.4
+Probability maps of the enhancing tumour of A0, A3, A4 and A5 on four HGG-like test phantoms; white contour: reference enhancing tumour.
+@end
+
+@section[x-slice] Dice along the Slice Axis
+
+@fig:x-slice plots the Dice score of single axial slices, averaged over the test phantoms, against the relative position of the slice between the first and the last slice that contains the tumour; slices without reference voxels of the region are excluded. @tab:x-slice gives the mean over the four central positions and over the four outer positions.
+
+@fig x-slice | file={FIGDIR}/x_slice.png | width=6.4
+Slice-wise Dice of A0 and A5 against the relative slice position within the tumour extent (mean over the test phantoms).
+@end
+
+@tab x-slice | widths=1.0,1.5,1.5,1.5 | align=cccc | size=9
+Slice-wise Dice in the central part / at the ends of the tumour extent (mean over test phantoms).
+| Variant | WT | TC | ET |
+| --- | --- | --- | --- |
+| A0 | 0.924 / 0.712 | 0.892 / nan | 0.432 / nan |
+| A5 | 0.929 / 0.746 | 0.895 / nan | 0.519 / nan |
+@end
+
+For WT and TC the accuracy is highest in the central slices (A5: 0.929 and 0.895) and falls towards the poles of the lesion (0.746 and nan), where partial volume and the blur of the labels dominate. For ET the profile does not follow this pattern: the mean over the central positions (0.519 for A5, 0.432 for A0) is higher than that over the outer positions (nan and nan). A plausible reason, which the data do not test, is the geometry of the hard phantoms: the enhancing tumour is a thin shell, so that a central slice cuts it as a ring whose thickness is a few voxels and a boundary error of one voxel removes a large fraction of it, whereas the slices near the poles cut it tangentially as a compact disc. The ranking of the two networks along the axis changes between positions, in agreement with the small and unstable difference of the means.
+
+@section[x-grade2] Diagnostics of the Grade Classification
+
+@fig:x-roc shows the ROC curves of the four combinations of mask source and classifier of @tab:hd-grade-tab, and @fig:x-gprob the distribution of the predicted probability of the high grade for the logistic model on predicted masks. @tab:x-gcm gives the confusion counts at the threshold 0.5.
+
+@fig x-roc | file={FIGDIR}/x_roc.png | width=6.4
+ROC curves of the grade classifiers on the hard benchmark: (a) cross-validated predictions on the development phantoms, (b) predictions on the test phantoms.
+@end
+
+@fig x-gprob | file={FIGDIR}/x_gprob.png | width=6.2
+Predicted probability of the high grade (logistic regression, features of the predicted masks) for HGG-like and LGG-like phantoms: (a) cross-validated, (b) test.
+@end
+
+@tab x-gcm | widths=1.8,0.9,0.9,0.9,0.9 | align=lcccc | size=9
+Confusion counts of the logistic model on features of predicted masks at the threshold 0.5 (HGG-like is the positive class).
+| Set | True positive | False negative | False positive | True negative |
+| --- | --- | --- | --- | --- |
+| Cross-validated (development) | 35 | 61 | 7 | 25 |
+| Test | 19 | 5 | 1 | 7 |
+@end
+
+The curves of the models on the reference masks rise to the corner of the plot in both panels, whereas those on the predicted masks stay close to the diagonal in the cross-validated panel and rise above it in the test panel, which is the discrepancy discussed in Section @sec:hd-grade. The histograms show where it comes from: in the cross-validated panel a large group of phantoms of both grades receives a probability close to zero or close to one irrespective of its true grade, and in the test panel the 24 HGG-like phantoms are spread over a wide range of probabilities while the few LGG-like phantoms lie at its lower end. The confusion counts of @tab:x-gcm rest on 32 test phantoms, of which 8 are LGG-like, so that a change of the classification of a single phantom moves the sensitivity or specificity by several per cent.

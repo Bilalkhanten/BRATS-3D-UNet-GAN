@@ -1,0 +1,151 @@
+@chapter[lit] Literature Review
+
+@section Introduction to the Chapter
+
+This chapter surveys the literature on which the thesis builds. It proceeds from the clinical problem to the benchmark that operationalises it (Sections @sec:clin and @sec:brats), through the families of deep networks that have been applied to it (Sections @sec:dl, @sec:att and @sec:fusion), to the loss functions, adversarial methods and evaluation practices that determine how such networks are trained and judged (Sections @sec:loss, @sec:gan, @sec:gan-seg and @sec:eval), and finally to radiomic grading (Section @sec:grading). The chapter closes with a synthesis of the gaps that motivate the thesis (Section @sec:gaps). The review is selective rather than exhaustive: it concentrates on work that bears directly on the design decisions of Chapter 3, and it quotes numerical results only where they could be checked against the primary source.
+
+@section[clin] Clinical and Imaging Background
+
+@subsection Classification and grading of gliomas
+
+The World Health Organization (WHO) classification of tumours of the central nervous system grades diffuse gliomas on a scale from II to IV according to histological and, since 2016, molecular features [@who2016]. The 2021 revision further integrates molecular markers, such as the isocitrate dehydrogenase (IDH) mutation status, into the definition of tumour types and abandons the earlier strict separation of "low-grade" and "high-grade" entities in favour of type-specific grading [@who2021]. For the purposes of computational benchmarks, however, the older dichotomy remains the practical standard: in the BraTS releases, grade II tumours are labelled *low-grade glioma* (LGG), whereas grade III and grade IV tumours (the latter being glioblastoma) are labelled *high-grade glioma* (HGG) [@brats17]. The prognostic gap between the groups is large, and the standard of care for glioblastoma, maximal safe resection followed by radiotherapy with concomitant and adjuvant temozolomide, was established in a randomised trial that documented a survival benefit of the combined treatment [@stupp].
+
+The definitive grade is established by histopathology and molecular analysis of tissue. Pre-operative imaging cannot replace it, but imaging-derived grade estimates are of interest for three reasons: they are available before surgery, they integrate information from the entire lesion rather than from a biopsy sample, and they can support the planning of the biopsy itself. This is the use case behind the grade-classification task studied in this thesis, which is accordingly presented as a downstream demonstration of segmentation quality and not as a clinical diagnostic claim.
+
+@subsection The role of MRI and of segmentation in the clinical workflow
+
+Response Assessment in Neuro-Oncology (RANO) criteria for high-grade glioma define progression through bidimensional measurements of the contrast-enhancing lesion, together with changes in non-enhancing T2/FLAIR signal, corticosteroid use and clinical status [@rano]. These measures are acquired manually and are sensitive to the choice of the slice and of the observer; volumetric measures derived from a segmentation are in principle more reproducible and more informative, provided the segmentation itself is accurate and reproducible. In radiotherapy planning, the gross tumour volume is delineated on contrast-enhanced T1 images and the clinical target volume is extended using T2/FLAIR abnormality, so that sub-region-level accuracy of the segmentation has direct dosimetric relevance. In surgical planning, the extent of the enhancing tumour relative to eloquent cortex is of primary interest. Finally, radiomics, the high-throughput extraction of quantitative features from medical images, depends on a reproducible region of interest as its input [@gillies; @aerts; @ibsi].
+
+@section[brats] The BraTS Benchmark
+
+@subsection From a pilot benchmark to an annual challenge
+
+The BraTS challenge was launched at the MICCAI conference in 2012 and has been run annually since then. The benchmark paper of Menze *et al.* describes the first phase of the initiative: 65 multi-contrast scans of patients with low- or high-grade glioma, each annotated by up to four raters, were complemented by 65 simulated scans and used to evaluate twenty segmentation algorithms, whose performance was compared with the variability between human raters [@brats15]. Over the following years the data set grew considerably; the retrospective analysis of the challenge by Bakas *et al.* reports that the 2018 edition comprised 542 cases (285 for training, 66 for validation and 191 for testing) and that 63 independent teams took part in its testing phase [@brats18]. The collections were assembled from multi-institutional data of The Cancer Imaging Archive and curated with expert segmentation labels [@tcia]. The 2021 edition, organised jointly by RSNA, ASNR and MICCAI, further enlarged the data and added a radiogenomic classification task [@brats21].
+
+@subsection Data, annotation protocol and evaluation
+
+All BraTS volumes consist of the four sequences described in Chapter 1, rigidly co-registered to a common template, interpolated to 1 mm isotropic resolution and skull-stripped. Annotations follow a common protocol in which the three intra-tumoural labels (NCR/NET, ED, ET) are drawn by trained raters and then verified by experienced neuroradiologists. The challenge evaluates the nested regions WT, TC and ET by the Dice coefficient and, in recent editions, the 95th-percentile Hausdorff distance, which tempers the sensitivity of the maximum distance to isolated outlier voxels [@hausdorff]. Two properties of this protocol are worth stressing for what follows. First, the evaluation is *whole-volume*: false-positive voxels anywhere in the brain count against a method. Second, the validation and test data of the challenge are hidden; participants receive scores through an online system but never access the test labels, which is a safeguard against tuning on the test set that local experiments must replicate by construction.
+
+@subsection Lessons from top-ranked methods
+
+The leaderboards of the challenge provide a documented history of what works. @tab:topbrats summarises the entries that are most relevant for this thesis, with the numerical results restricted to those stated by the primary sources.
+
+@tab topbrats | widths=1.0,1.55,3.95 | align=lll | size=9
+Selected BraTS entries relevant for the present design (characterisation based on the primary sources).
+| Entry | Core idea | Reported result (as stated by the authors) |
+| --- | --- | --- |
+| Myronenko, 2018 [@myronenko] | Asymmetric encoder--decoder with an auxiliary variational-autoencoder branch regularising the encoder | Reported as the winning entry of BraTS 2018 |
+| Isensee *et al.*, 2018 [@nonew] | "No New-Net": plain 3D U-Net with leaky ReLU and instance normalisation, large patches, region-based training, loss combination, co-training with extra data | Second place on the BraTS 2018 test set (Dice 77.88 ET, 87.81 WT, 80.62 TC); validation ensemble 80.87/91.26/86.34 |
+| Isensee *et al.*, 2020 [@nnunet_brats20] | Self-configuring nnU-Net with region-based training, ensemble, post-processing | Test Dice 82.03 ET, 88.95 WT, 85.06 TC; HD95 17.805, 8.498, 17.337 mm |
+@end
+
+Three conclusions can be drawn. First, a plain U-Net with minor but deliberate modifications (instance rather than batch normalisation because of the small batch size, leaky rectifiers, and large input patches) can rank among the top entries, which supports the view that careful training matters more than elaborate architecture. Second, *region-based* training, in which the network predicts the evaluation regions WT, TC and ET directly with sigmoid outputs, aligns the optimisation target with the evaluation criterion and was adopted by the later nnU-Net entry. Third, the values for ET are the lowest of the three regions in both entries for which numbers are quoted, which marks ET as the hardest region, in part because it is small and in part because an enhancing tumour may be absent altogether in lower-grade cases; this is the source of the empty-region conventions that Chapter 3 must handle with care.
+
+@tab pubres | widths=1.55,1.0,0.65,0.65,0.65,1.5 | align=llcccl | size=8.5
+Published Dice scores (%) of the entries discussed in this section, as stated in the primary sources, and the status of the present work. The entries use different editions and different test sets and are therefore not directly comparable with each other or with this thesis.
+| Study | Data, set | ET | WT | TC | Remark |
+| --- | --- | --- | --- | --- | --- |
+| Myronenko [@myronenko] | BraTS 2018, validation (single model) | 81.45 | 90.42 | 85.96 | Winner of the 2018 challenge |
+| Myronenko (ensemble) | BraTS 2018, test (ensemble of 10) | 76.64 | 88.39 | 81.54 | 191 test cases |
+| No New-Net [@nonew] | BraTS 2018, test | 77.88 | 87.81 | 80.62 | Second place |
+| nnU-Net [@nnunet_brats20] | BraTS 2020, test | 82.03 | 88.95 | 85.06 | Ensemble of 25 models |
+| SegAN [@segan] | BRATS 2015, test | 66 | 85 | 70 | U-Net of the same authors: 64 / 80 / 63 |
+| **This thesis** | BraTS 2020, test (74 cases) | pending | pending | pending | Requires the GPU runs of the RUNBOOK |
+@end
+
+@tab:pubres collects the Dice scores that could be verified. Three observations follow. First, the enhancing tumour is the weakest region in every BraTS entry, in line with the discussion above. Second, the difference between the validation and the test score of the same method is of the order of several Dice points (Myronenko's single-model validation ET score of 81.45 against 76.64 on the test set), which is a reminder that a number is only meaningful together with the set on which it was obtained. Third, the table contains no entry for the present work: the BraTS 2020 experiments need a GPU that was not available while this document was prepared, and no value has been estimated or borrowed from another source. The protocol, the code and the analysis that will fill the row are specified in Chapters 3 and 4.
+
+@tab recipes | widths=1.25,1.15,1.1,1.3,1.1,0.9 | align=llllll | size=8
+Training recipes of the BraTS entries discussed in this section (as stated by the authors) and of this thesis.
+| Entry | Patch / batch | Normalisation, activation | Optimiser, schedule | Loss | Length |
+| --- | --- | --- | --- | --- | --- |
+| Myronenko [@myronenko] | 160$\times$192$\times$128 / 1 | Group norm., ReLU | Adam, $10^{-4}$, polynomial decay (power 0.9) | Dice + 0.1 L2 + 0.1 KL | 300 epochs |
+| No New-Net [@nonew] | $128^3$ / 2 | Instance norm., leaky ReLU (0.01) | Adam, $10^{-4}$, divided by 5 on plateau | Dice + cross-entropy | $\le$500 epochs of 250 batches |
+| nnU-Net [@nnunet_brats20] | $128^3$ / 2 (baseline) | Instance norm. | SGD, Nesterov 0.99, $10^{-2}$, polynomial decay | Dice + cross-entropy, region-based | 1000 epochs of 250 iterations |
+| **This thesis** | $128^3$ / 2 | Instance norm., leaky ReLU (0.01) | AdamW, $3\times10^{-4}$, polynomial decay (power 0.9) | Dice + Tversky + BCE with deep supervision; LSGAN term in the last 50 epochs | 350 epochs of 250 iterations |
+@end
+
+@tab:recipes shows that the recipe of this thesis stays within the range established by these entries: patches and batch size equal to those of the nnU-Net-based entries, the normalisation and activation of No New-Net, and a polynomial schedule as in the two entries that report one. Its training budget (87,500 generator updates) is lower than that of the nnU-Net entry (250,000 iterations), a limitation that is taken up in the discussion.
+
+@section[dl] Deep Learning for Volumetric Segmentation
+
+@subsection From fully convolutional networks to the U-Net
+
+Fully convolutional networks replaced the fully connected layers of classification networks by convolutions, so that a network trained on image patches produces dense predictions for images of arbitrary size [@fcn]. The U-Net adapted this idea to biomedical images with few annotated examples: a contracting path of convolution and down-sampling captures context, an expanding path of up-sampling restores resolution, and *skip connections* concatenate encoder features with decoder features so that fine spatial detail is not lost [@unet]. Extensions to three dimensions followed: the 3D U-Net learns dense volumetric segmentation from sparsely annotated volumes [@unet3d], and the V-Net introduced residual connections within the stages and optimised an overlap-based objective, the Dice loss, directly [@vnet]. For brain tumours, early convolutional approaches classified patches with multi-scale or cascaded pathways [@pereira; @havaei; @deepmedic], whereas the later trend favoured encoder--decoder architectures that process large three-dimensional patches in a single pass.
+
+@fig lit-unet2d | file=figs/f_unet2d.png | width=6.0
+The 2-D U-Net: a contracting path of convolutions and max-pooling, an expanding path of up-convolutions, and skip connections that concatenate encoder features with decoder features of the same resolution. Schematic redrawn by the author after [@unet].
+@end
+
+@fig lit-unet3d | file=figs/f_unet3d.png | width=6.0
+The 3-D U-Net: the same topology with volumetric convolutions, so that a volume is segmented in one pass from sparsely annotated training data. Schematic redrawn by the author after [@unet3d].
+@end
+
+@fig:lit-unet2d and @fig:lit-unet3d show the two reference architectures from which every network of this thesis descends. The decisive element is the skip connection: it hands high-resolution encoder features to the decoder, so that the up-sampling path does not have to reconstruct fine boundaries from the coarse bottleneck representation alone. Moving from two to three dimensions changes the cost rather than the idea. A volumetric feature map of $C$ channels at resolution $D\times H\times W$ stores $CDHW$ activations, and a $3\times3\times3$ convolution has three times as many weights per channel pair as its $3\times3$ counterpart, which is why 3-D networks are trained on patches and with batch sizes of one or two (Chapter 3).
+
+@subsection Architectural refinements
+
+Several refinements to the encoder--decoder template have been proposed. Residual connections ease the optimisation of deep networks by letting each block learn a correction to the identity mapping [@resnet]. Nested and densely connected skip pathways, as in UNet++, aim to reduce the semantic gap between encoder and decoder features [@unetpp]. Normalisation layers adapt to the training regime: batch normalisation [@bn] relies on batch statistics that are unreliable for the batch sizes of two or less that are typical of 3D medical training, which is why instance normalisation [@instnorm] and leaky rectifiers [@lrelu] are standard in this setting. Deep supervision, in which auxiliary outputs at coarser decoder resolutions receive their own loss, shortens the gradient path to intermediate layers and regularises the decoder [@deepsup].
+
+@subsection Self-configuring pipelines
+
+The nnU-Net framework reframed the question of architecture design. Rather than proposing a new topology, it automates the configuration of a standard U-Net variant (patch size, batch size, network depth, normalisation, augmentation, post-processing) from fingerprints of the data set, and it showed that such a pipeline exceeded most specialised methods on a large collection of segmentation tasks [@nnunet]. Its central message for subsequent work is a methodological one: improvements claimed for architectural changes should be demonstrated against a baseline configured with comparable care. The experimental design of this thesis follows that message by including nnU-Net as a reference baseline (Chapter 3), and by training every ablation variant with an identical optimisation, augmentation and inference pipeline, so that the effect of an architectural component is not confounded with a change of training recipe. Open-source frameworks such as MONAI make these building blocks widely accessible [@monai].
+
+@fig lit-nnunet | file=figs/f_nnunet.png | width=6.0
+nnU-Net: parameters that are fixed for all data sets, parameters derived by rules from the data-set fingerprint, and parameters decided empirically by cross-validation. Schematic redrawn by the author after [@nnunet].
+@end
+
+@fig:lit-nnunet summarises this division of labour. The fixed part (loss, optimiser, augmentation, normalisation) encodes accumulated experience; the rule-based part adapts patch size, batch size and network depth to the memory budget and the image geometry; and only the choice among candidate configurations is empirical.
+
+@subsection Transformer-based segmentation
+
+The success of self-attention in language and vision [@transformer; @vit] has led to transformer-based segmentation networks. TransUNet combines a convolutional encoder with a transformer encoding of the feature map [@transunet]; TransBTS embeds a transformer between the encoder and decoder of a 3D network for brain tumour segmentation [@transbts]; UNETR feeds a sequence of volumetric patch embeddings to a transformer encoder and decodes through skip connections [@unetr]; and Swin UNETR replaces the plain transformer with shifted-window attention and reports results as a participant of the BraTS 2021 challenge, ranking among the top-performing approaches in the validation phase according to its authors [@swinunetr]. These models offer a global receptive field from the first layer, at the price of a higher memory and data requirement. Their relative merits compared with well-configured convolutional baselines on a data set of a few hundred cases remain an open question, which is one reason why this thesis restricts itself to a convolutional backbone and leaves transformers as future work.
+
+@fig lit-swin | file=figs/f_swinunetr.png | width=6.0
+Swin UNETR: a four-stage shifted-window transformer encoder whose stage outputs feed a convolutional decoder through skip connections. Schematic redrawn by the author after [@swinunetr].
+@end
+
+@fig:lit-swin sketches the transformer-based design for comparison with the convolutional template of @fig:lit-unet3d. The encoder computes self-attention inside local windows, shifts the windows between consecutive blocks so that information crosses window borders, and merges patches between stages to build a feature pyramid; the decoder is an ordinary convolutional up-sampling path.
+
+@tab archcmp | widths=1.35,0.55,3.2,1.4 | align=lcll | size=8.5
+Comparison of the segmentation architectures discussed in this section with the network proposed in this thesis.
+| Network | Dim. | Distinctive element | Application in the original paper |
+| --- | --- | --- | --- |
+| U-Net [@unet] | 2-D | Skip connections concatenating encoder and decoder features | Biomedical (microscopy) images |
+| 3D U-Net [@unet3d] | 3-D | Volumetric convolutions, training from sparse annotation | Volumetric confocal data |
+| V-Net [@vnet] | 3-D | Residual stages and a Dice-based objective | Prostate MRI |
+| Attention U-Net [@attunet] | 3-D | Soft attention gates on the skip connections | Pancreas CT |
+| nnU-Net [@nnunet] | 2-D / 3-D | Automatic configuration of a standard U-Net from data-set properties | Many biomedical tasks |
+| Myronenko [@myronenko] | 3-D | Residual blocks, group normalisation, auxiliary variational auto-encoder branch | BraTS 2018 |
+| TransBTS [@transbts] | 3-D | Transformer between the convolutional encoder and decoder | BraTS 2019 and 2020 |
+| Swin UNETR [@swinunetr] | 3-D | Shifted-window transformer encoder at four resolutions | BraTS 2021 |
+| **This thesis** | 3-D | Residual U-Net with attention gates, modality-attentive fusion stem, deep supervision, Tversky loss and a conditional PatchGAN | BraTS 2020 and synthetic benchmarks |
+@end
+
+@tab:archcmp places the proposed network among its predecessors. The thesis does not claim a new backbone: each ingredient has a precedent, and the contribution lies in assembling them in one network whose parts can be switched on and off one by one, so that their individual effect is measured under a common training recipe (Chapter 4).
+
+@section[att] Attention Mechanisms in Segmentation Networks
+
+@subsection Channel attention
+
+Squeeze-and-excitation (SE) blocks recalibrate feature channels by pooling each channel globally, passing the descriptor through a small bottleneck network and rescaling the channels by the resulting gates [@se]. The convolutional block attention module (CBAM) adds a spatial gate computed from channel-pooled maps [@cbam]. Both mechanisms are lightweight and have been transferred to volumetric networks. They are relevant here because the modality-attentive fusion module of this thesis (Chapter 3) applies the same squeeze-and-gate idea along the *modality* axis rather than the feature axis.
+
+@subsection Attention gates on skip connections
+
+The skip connections of a U-Net transfer all encoder features, including those from irrelevant regions, to the decoder. Attention gates (AG) address this by learning a soft spatial mask for each skip connection from the skip features and a *gating signal* taken from a coarser decoder level; the mask suppresses features outside the target structure before concatenation [@attunet; @attgated]. Because the AG is computed from decoder context, it can condition the skip features on the globally predicted tumour extent without an explicit localisation stage. Focal Tversky loss with an attention U-Net has been proposed for lesion segmentation with strong class imbalance [@focaltv].
+
+@fig lit-ag | file=figs/f_attn_gate.png | width=5.6
+Additive attention gate: the skip features and a gating signal from the coarser decoder level are projected, added, passed through a rectifier and a sigmoid to give a spatial coefficient map that rescales the skip features. Schematic redrawn by the author after [@attunet].
+@end
+
+@fig:lit-ag shows the mechanism. Both inputs are projected to a common intermediate width, summed, rectified and reduced to a single-channel map by a $1\times1\times1$ convolution and a sigmoid; the resulting coefficients in $[0,1]$ multiply the skip features voxel by voxel. The gate adds few parameters, and its coefficient map can be displayed, which Chapter 4 exploits.
+
+@subsection Self-attention
+
+Self-attention computes, for each position, a weighted sum over all positions, with weights derived from learned similarity [@transformer]. Its cost grows quadratically with the number of positions, which is prohibitive at full volumetric resolution; the transformer-based segmentation networks discussed above therefore apply it to down-sampled or windowed feature maps [@unetr].
+
+@section[fusion] Multimodal Fusion
+
+The way in which the four MRI sequences are combined is a design decision in its own right. Three strategies are common [@zhou_fusion]. *Early fusion* stacks the modalities as input channels of a single network; it is simple, lets the first layer learn cross-modal interactions, and is the standard in the BraTS entries cited above. *Late fusion* processes each modality in a separate network and merges the outputs, which preserves modality-specific representations at the cost of parameters. *Intermediate fusion* sits between the two and merges features at one or several depths. The hetero-modal image segmentation network (HeMIS) learns a modality-specific encoder and merges the abstract features by their mean and variance, which makes it robust to missing modalities [@hemis]. HyperDense-Net connects all layers of all modality streams densely so that every layer can access the features of every stream [@hyperdense], and RFNet adds region-aware fusion for incomplete modality sets [@rfnet].
+
+The modality-attentive fusion (MAF) stem of this thesis is closest in spirit to the squeeze-and-gate idea of [@se] applied across modalities: it computes a modality-specific shallow feature map for every sequence, estimates a per-channel softmax weighting of the modalities from globally pooled descriptors, and passes both the weighted sum and the individual maps to the encoder. The intent is to let the network adapt the contribution of, for example, FLAIR and T1ce to the shallow representation of the current case. Whether this adaptive fusion helps over plain early fusion is an empirical question; Chapter 4 reports a controlled comparison (ablation A3 against A2).

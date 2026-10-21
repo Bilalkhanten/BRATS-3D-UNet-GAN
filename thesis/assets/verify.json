@@ -1,0 +1,600 @@
+{
+ "v1_dice_iou": [
+  {
+   "mu": 0.85,
+   "sd": 0.02,
+   "mean_dice": 0.8499888620638161,
+   "mean_iou": 0.7396388712201224,
+   "iou_of_mean_dice": 0.7391135911859172,
+   "jensen_gap": 0.0005252800342051556
+  },
+  {
+   "mu": 0.85,
+   "sd": 0.05,
+   "mean_dice": 0.8500382855718844,
+   "mean_iou": 0.7424203761569629,
+   "iou_of_mean_dice": 0.7391883354956863,
+   "jensen_gap": 0.0032320406612765806
+  },
+  {
+   "mu": 0.85,
+   "sd": 0.1,
+   "mean_dice": 0.8497501768344853,
+   "mean_iou": 0.7510590868236485,
+   "iou_of_mean_dice": 0.7387527124289858,
+   "jensen_gap": 0.012306374394662756
+  },
+  {
+   "mu": 0.9,
+   "sd": 0.02,
+   "mean_dice": 0.9000058739225011,
+   "mean_iou": 0.8187888289246531,
+   "iou_of_mean_dice": 0.8181915271964755,
+   "jensen_gap": 0.0005973017281776238
+  },
+  {
+   "mu": 0.9,
+   "sd": 0.05,
+   "mean_dice": 0.900058226917807,
+   "mean_iou": 0.8219046347359578,
+   "iou_of_mean_dice": 0.8182780661159146,
+   "jensen_gap": 0.00362656862004318
+  },
+  {
+   "mu": 0.9,
+   "sd": 0.1,
+   "mean_dice": 0.9001004057475964,
+   "mean_iou": 0.8317447130780823,
+   "iou_of_mean_dice": 0.8183477932450647,
+   "jensen_gap": 0.013396919833017606
+  },
+  {
+   "mu": 0.95,
+   "sd": 0.02,
+   "mean_dice": 0.9499714335646346,
+   "mean_iou": 0.9053937272516576,
+   "iou_of_mean_dice": 0.9047100849737788,
+   "jensen_gap": 0.0006836422778787599
+  },
+  {
+   "mu": 0.95,
+   "sd": 0.05,
+   "mean_dice": 0.9500718831776394,
+   "mean_iou": 0.9089041933539057,
+   "iou_of_mean_dice": 0.9048923140119923,
+   "jensen_gap": 0.0040118793419133825
+  },
+  {
+   "mu": 0.95,
+   "sd": 0.1,
+   "mean_dice": 0.9500632106447234,
+   "mean_iou": 0.9184425525998405,
+   "iou_of_mean_dice": 0.9048765795016276,
+   "jensen_gap": 0.013565973098212947
+  },
+  {
+   "mu": 0.99,
+   "sd": 0.02,
+   "mean_dice": 0.9899694177696478,
+   "mean_iou": 0.9808685469174816,
+   "iou_of_mean_dice": 0.9801380623382655,
+   "jensen_gap": 0.0007304845792160952
+  },
+  {
+   "mu": 0.99,
+   "sd": 0.05,
+   "mean_dice": 0.9900619944105501,
+   "mean_iou": 0.9838565316781135,
+   "iou_of_mean_dice": 0.9803195730144851,
+   "jensen_gap": 0.0035369586636283534
+  }
+ ],
+ "v1_constraints": {
+  "iou_floor_for_dice_0.99": 0.9801980198019802,
+  "max_dice_for_iou_0.97": 0.9847715736040609,
+  "f1_from_P0.9756_R0.9837": 0.979633256775379
+ },
+ "v2_gradient_mass": [
+  {
+   "frac": 0.002,
+   "bce": {
+    "tumour_mass": 0.0014011341845616698,
+    "bg_mass": 0.050110843032598495
+   },
+   "dice": {
+    "tumour_mass": 0.015738241374492645,
+    "bg_mass": 0.020518116652965546
+   },
+   "tversky": {
+    "tumour_mass": 0.02498108334839344,
+    "bg_mass": 0.030982675030827522
+   }
+  },
+  {
+   "frac": 0.005,
+   "bce": {
+    "tumour_mass": 0.003502835752442479,
+    "bg_mass": 0.04996021091938019
+   },
+   "dice": {
+    "tumour_mass": 0.03617065027356148,
+    "bg_mass": 0.04457690939307213
+   },
+   "tversky": {
+    "tumour_mass": 0.054072752594947815,
+    "bg_mass": 0.059430621564388275
+   }
+  },
+  {
+   "frac": 0.01,
+   "bce": {
+    "tumour_mass": 0.007005671970546246,
+    "bg_mass": 0.049709148705005646
+   },
+   "dice": {
+    "tumour_mass": 0.06371428072452545,
+    "bg_mass": 0.07191335409879684
+   },
+   "tversky": {
+    "tumour_mass": 0.08833964169025421,
+    "bg_mass": 0.08150678873062134
+   }
+  },
+  {
+   "frac": 0.02,
+   "bce": {
+    "tumour_mass": 0.014011340215802193,
+    "bg_mass": 0.049207039177417755
+   },
+   "dice": {
+    "tumour_mass": 0.10270076245069504,
+    "bg_mass": 0.09899836033582687
+   },
+   "tversky": {
+    "tumour_mass": 0.12922008335590363,
+    "bg_mass": 0.0899156853556633
+   }
+  },
+  {
+   "frac": 0.05,
+   "bce": {
+    "tumour_mass": 0.0350283607840538,
+    "bg_mass": 0.047700703144073486
+   },
+   "dice": {
+    "tumour_mass": 0.1614404022693634,
+    "bg_mass": 0.10686033964157104
+   },
+   "tversky": {
+    "tumour_mass": 0.17867513000965118,
+    "bg_mass": 0.07029921561479568
+   }
+  },
+  {
+   "frac": 0.1,
+   "bce": {
+    "tumour_mass": 0.07005671411752701,
+    "bg_mass": 0.04519013315439224
+   },
+   "dice": {
+    "tumour_mass": 0.19859957695007324,
+    "bg_mass": 0.08380346745252609
+   },
+   "tversky": {
+    "tumour_mass": 0.20467887818813324,
+    "bg_mass": 0.04502275958657265
+   }
+  },
+  {
+   "frac": 0.2,
+   "bce": {
+    "tumour_mass": 0.14011342823505402,
+    "bg_mass": 0.040169015526771545
+   },
+   "dice": {
+    "tumour_mass": 0.22383226454257965,
+    "bg_mass": 0.05075445771217346
+   },
+   "tversky": {
+    "tumour_mass": 0.2206909954547882,
+    "bg_mass": 0.02371296100318432
+   }
+  },
+  {
+   "frac": 0.4,
+   "bce": {
+    "tumour_mass": 0.28022685647010803,
+    "bg_mass": 0.03012676350772381
+   },
+   "dice": {
+    "tumour_mass": 0.2387087196111679,
+    "bg_mass": 0.02266739308834076
+   },
+   "tversky": {
+    "tumour_mass": 0.22965598106384277,
+    "bg_mass": 0.00973584409803152
+   }
+  }
+ ],
+ "v9": {
+  "TP": 1000,
+  "dice_at_fn200_fp0": 0.09090909090909094,
+  "dice_at_fn0_fp200": 0.09090909090909094,
+  "tv_at_fn200_fp0": 0.1228070175438597,
+  "tv_at_fn0_fp200": 0.05660377358490565
+ },
+ "v3_complexity": [
+  {
+   "params": 16547337,
+   "gmacs": 478.144364544,
+   "gflops": 956.288729088,
+   "activation_elems_M": 1166.835712,
+   "activation_GB_fp32": 4.667342848,
+   "name": "plain 3D U-Net"
+  },
+  {
+   "params": 16849033,
+   "gmacs": 487.447330816,
+   "gflops": 974.894661632,
+   "activation_elems_M": 1523.679232,
+   "activation_GB_fp32": 6.094716928,
+   "name": "+ residual blocks"
+  },
+  {
+   "params": 16936557,
+   "gmacs": 491.518427136,
+   "gflops": 983.036854272,
+   "activation_elems_M": 1615.204352,
+   "activation_GB_fp32": 6.460817408,
+   "name": "+ attention gates"
+  },
+  {
+   "params": 16965317,
+   "gmacs": 550.976881664,
+   "gflops": 1101.953763328,
+   "activation_elems_M": 2084.966432,
+   "activation_GB_fp32": 8.339865728,
+   "name": "+ modality-attentive fusion"
+  },
+  {
+   "name": "discriminator (PatchGAN, 3D)",
+   "params": 2783713,
+   "gmacs": NaN,
+   "gflops": NaN,
+   "activation_elems_M": NaN,
+   "activation_GB_fp32": NaN
+  }
+ ],
+ "v3_rf_early": [
+  {
+   "stage": 0,
+   "stride": 1,
+   "rf": 5
+  },
+  {
+   "stage": 1,
+   "stride": 2,
+   "rf": 11
+  },
+  {
+   "stage": 2,
+   "stride": 4,
+   "rf": 23
+  },
+  {
+   "stage": 3,
+   "stride": 8,
+   "rf": 47
+  },
+  {
+   "stage": 4,
+   "stride": 16,
+   "rf": 95
+  }
+ ],
+ "v3_rf_maf": [
+  {
+   "stage": 0,
+   "stride": 1,
+   "rf": 7
+  },
+  {
+   "stage": 1,
+   "stride": 2,
+   "rf": 13
+  },
+  {
+   "stage": 2,
+   "stride": 4,
+   "rf": 25
+  },
+  {
+   "stage": 3,
+   "stride": 8,
+   "rf": 49
+  },
+  {
+   "stage": 4,
+   "stride": 16,
+   "rf": 97
+  }
+ ],
+ "v7_windows": [
+  {
+   "shape": [
+    240,
+    240,
+    155
+   ],
+   "label": "full BraTS volume",
+   "patch": 96,
+   "overlap": 0.0,
+   "windows": 18
+  },
+  {
+   "shape": [
+    240,
+    240,
+    155
+   ],
+   "label": "full BraTS volume",
+   "patch": 96,
+   "overlap": 0.25,
+   "windows": 18
+  },
+  {
+   "shape": [
+    240,
+    240,
+    155
+   ],
+   "label": "full BraTS volume",
+   "patch": 96,
+   "overlap": 0.5,
+   "windows": 48
+  },
+  {
+   "shape": [
+    240,
+    240,
+    155
+   ],
+   "label": "full BraTS volume",
+   "patch": 96,
+   "overlap": 0.75,
+   "windows": 196
+  },
+  {
+   "shape": [
+    240,
+    240,
+    155
+   ],
+   "label": "full BraTS volume",
+   "patch": 128,
+   "overlap": 0.0,
+   "windows": 8
+  },
+  {
+   "shape": [
+    240,
+    240,
+    155
+   ],
+   "label": "full BraTS volume",
+   "patch": 128,
+   "overlap": 0.25,
+   "windows": 18
+  },
+  {
+   "shape": [
+    240,
+    240,
+    155
+   ],
+   "label": "full BraTS volume",
+   "patch": 128,
+   "overlap": 0.5,
+   "windows": 18
+  },
+  {
+   "shape": [
+    240,
+    240,
+    155
+   ],
+   "label": "full BraTS volume",
+   "patch": 128,
+   "overlap": 0.75,
+   "windows": 50
+  },
+  {
+   "shape": [
+    160,
+    192,
+    144
+   ],
+   "label": "typical brain crop",
+   "patch": 96,
+   "overlap": 0.0,
+   "windows": 8
+  },
+  {
+   "shape": [
+    160,
+    192,
+    144
+   ],
+   "label": "typical brain crop",
+   "patch": 96,
+   "overlap": 0.25,
+   "windows": 12
+  },
+  {
+   "shape": [
+    160,
+    192,
+    144
+   ],
+   "label": "typical brain crop",
+   "patch": 96,
+   "overlap": 0.5,
+   "windows": 18
+  },
+  {
+   "shape": [
+    160,
+    192,
+    144
+   ],
+   "label": "typical brain crop",
+   "patch": 96,
+   "overlap": 0.75,
+   "windows": 60
+  },
+  {
+   "shape": [
+    160,
+    192,
+    144
+   ],
+   "label": "typical brain crop",
+   "patch": 128,
+   "overlap": 0.0,
+   "windows": 8
+  },
+  {
+   "shape": [
+    160,
+    192,
+    144
+   ],
+   "label": "typical brain crop",
+   "patch": 128,
+   "overlap": 0.25,
+   "windows": 8
+  },
+  {
+   "shape": [
+    160,
+    192,
+    144
+   ],
+   "label": "typical brain crop",
+   "patch": 128,
+   "overlap": 0.5,
+   "windows": 8
+  },
+  {
+   "shape": [
+    160,
+    192,
+    144
+   ],
+   "label": "typical brain crop",
+   "patch": 128,
+   "overlap": 0.75,
+   "windows": 12
+  }
+ ],
+ "v5_slice_dependence": {
+  "n_patients": 100,
+  "mean_tumour_slices": 18,
+  "adjacent_slice_corr": 0.9752066201343134,
+  "icc1": 0.19737055918453003,
+  "design_effect": 4.35529950613701,
+  "n_slices": 1764,
+  "effective_n": 405.02381007652053
+ },
+ "v6_coverage": [
+  {
+   "n": 10,
+   "cov_bootstrap": 0.8875,
+   "cov_t": 0.9275,
+   "width_bootstrap": 0.10712218693885917,
+   "width_t": 0.1323815896411678
+  },
+  {
+   "n": 20,
+   "cov_bootstrap": 0.905,
+   "cov_t": 0.925,
+   "width_bootstrap": 0.08296745575525194,
+   "width_t": 0.0918463762891798
+  },
+  {
+   "n": 40,
+   "cov_bootstrap": 0.915,
+   "cov_t": 0.925,
+   "width_bootstrap": 0.0604720764366367,
+   "width_t": 0.06358781598249733
+  },
+  {
+   "n": 74,
+   "cov_bootstrap": 0.9525,
+   "cov_t": 0.9575,
+   "width_bootstrap": 0.04480903240046257,
+   "width_t": 0.04621087352465528
+  },
+  {
+   "n": 150,
+   "cov_bootstrap": 0.9475,
+   "cov_t": 0.955,
+   "width_bootstrap": 0.03140869125847039,
+   "width_t": 0.031968130205037235
+  },
+  {
+   "n": 300,
+   "cov_bootstrap": 0.9525,
+   "cov_t": 0.955,
+   "width_bootstrap": 0.02239277093257062,
+   "width_t": 0.022655512996044114
+  }
+ ],
+ "v8_mde": [
+  {
+   "sd_diff": 0.03,
+   "n": 20,
+   "mde": 0.018793604977377518
+  },
+  {
+   "sd_diff": 0.03,
+   "n": 74,
+   "mde": 0.009770329990356616
+  },
+  {
+   "sd_diff": 0.03,
+   "n": 295,
+   "mde": 0.00489343793081714
+  },
+  {
+   "sd_diff": 0.05,
+   "n": 20,
+   "mde": 0.03132267496229586
+  },
+  {
+   "sd_diff": 0.05,
+   "n": 74,
+   "mde": 0.016283883317261025
+  },
+  {
+   "sd_diff": 0.05,
+   "n": 295,
+   "mde": 0.008155729884695234
+  },
+  {
+   "sd_diff": 0.08,
+   "n": 20,
+   "mde": 0.05011627993967338
+  },
+  {
+   "sd_diff": 0.08,
+   "n": 74,
+   "mde": 0.02605421330761764
+  },
+  {
+   "sd_diff": 0.08,
+   "n": 295,
+   "mde": 0.013049167815512375
+  }
+ ]
+}

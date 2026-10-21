@@ -1,0 +1,7 @@
+{
+  "name": "t_dice_eq",
+  "gan": false,
+  "w_tv": 1.0,
+  "tv_alpha": 0.5,
+  "tv_beta": 0.5
+}

@@ -1,0 +1,8 @@
+{
+  "name": "a5_full",
+  "residual": true,
+  "attention": true,
+  "fusion": "maf",
+  "gan": true,
+  "w_tv": 1.0
+}

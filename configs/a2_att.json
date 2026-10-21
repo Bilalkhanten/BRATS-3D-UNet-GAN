@@ -1,0 +1,8 @@
+{
+  "name": "a2_att",
+  "residual": true,
+  "attention": true,
+  "fusion": "early",
+  "gan": false,
+  "w_tv": 0.0
+}

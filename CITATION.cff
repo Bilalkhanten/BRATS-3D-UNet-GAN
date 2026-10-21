@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "bratsgan: 3D brain-tumour segmentation and grade classification with an attention-residual 3D U-Net and adversarial refinement"
+type: software
+version: 1.0.0
+authors:
+  - family-names: Khan
+    given-names: Muhammad Bilal
+license: MIT
+repository-code: "https://github.com/Bilalkhanten/BRATS-3D-U-Net-GAN"
+keywords:
+  - brain tumour segmentation
+  - BraTS
+  - 3D U-Net
+  - generative adversarial network
+  - glioma grading

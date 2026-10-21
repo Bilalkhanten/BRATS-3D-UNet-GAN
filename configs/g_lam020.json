@@ -1,0 +1,6 @@
+{
+  "name": "g_lam020",
+  "gan": true,
+  "w_tv": 1.0,
+  "adv_weight": 0.2
+}

@@ -1,0 +1,138 @@
+@section[loss] Loss Functions for Imbalanced Segmentation
+
+@subsection Voxel-wise cross-entropy and the imbalance problem
+
+For a voxel with target $t \in \{0,1\}$ and predicted probability $p$, the binary cross-entropy is $-t\log p-(1-t)\log(1-p)$. In a brain volume the tumour typically occupies a few percent of the voxels, and ET considerably less, so that the sum of the loss is dominated by the many easy background voxels. A network can attain a low average cross-entropy while producing empty or strongly under-sized masks. Class weighting and sampling strategies counteract this to a degree; the foreground-biased patch sampling used in this thesis is one such strategy, and focal losses reduce the contribution of well-classified voxels by a modulating factor [@focal].
+
+@subsection Overlap-based losses
+
+Overlap losses optimise a differentiable surrogate of the evaluation measure itself. The Dice coefficient, introduced as a measure of ecological association [@dice1945], equals twice the size of the intersection divided by the sum of the sizes. With soft predictions, $\mathrm{TP}=\sum_i p_i t_i$, $\mathrm{FP}=\sum_i p_i(1-t_i)$ and $\mathrm{FN}=\sum_i (1-p_i)t_i$, the soft Dice is $2\mathrm{TP}/(2\mathrm{TP}+\mathrm{FP}+\mathrm{FN})$; it was adopted as a loss for volumetric segmentation in the V-Net [@vnet]. Because it is a ratio of sums over the whole volume, it is insensitive to the number of background voxels. It has two weaknesses: its gradients are unstable when the foreground is tiny, and it treats false positives and false negatives symmetrically. The generalised Dice loss weights classes by the inverse of their squared volume to balance several classes of unequal size [@gdl]; the relation between the Dice and Jaccard (IoU) losses and the effect of optimising one when the other is evaluated are analysed by Bertels *et al.* and Eelbode *et al.* [@bertels; @eelbode]; the Lovász-softmax loss is a tractable surrogate for the IoU [@lovasz].
+
+The Tversky index generalises both Dice and Jaccard, with separate weights for the two kinds of error [@tversky1977]:
+
+@eq tversky-def
+\mathrm{TI}_{\alpha,\beta} = \frac{\mathrm{TP}}{\mathrm{TP}+\alpha\,\mathrm{FP}+\beta\,\mathrm{FN}}, \qquad \alpha,\beta \ge 0 .
+@end
+
+The choice $\alpha=\beta=1/2$ yields Dice and $\alpha=\beta=1$ yields the Jaccard index. Salehi *et al.* used it as a loss for highly imbalanced lesion segmentation, with $\beta>\alpha$ to emphasise recall [@tversky], and Abraham and Khan added a focal exponent [@focaltv]. Hybrid losses that combine overlap and cross-entropy terms have been shown to be effective and robust across tasks [@combo], and the survey of Ma *et al.* organises the many variants and compares them on several tasks [@odyssey]. Boundary-based losses penalise distances to the reference contour directly [@boundary]. @tab:losses summarises the properties of the losses that matter in the present design.
+
+@tab losses | widths=1.25,2.45,2.8 | align=lll | size=9
+Loss functions for imbalanced segmentation and the properties relevant to this thesis.
+| Loss | Definition | Behaviour |
+| --- | --- | --- |
+| Binary cross-entropy | $-\frac{1}{N}\sum_i [t_i\log p_i + (1-t_i)\log(1-p_i)]$ | Well-behaved gradients; dominated by background under imbalance |
+| Soft Dice | $1-\frac{2\mathrm{TP}}{2\mathrm{TP}+\mathrm{FP}+\mathrm{FN}}$ | Invariant to the background size; symmetric in FP and FN; unstable for tiny targets |
+| Tversky | $1-\frac{\mathrm{TP}}{\mathrm{TP}+\alpha\mathrm{FP}+\beta\mathrm{FN}}$ | Tunable recall--precision trade-off; Dice for $\alpha=\beta=\frac12$ |
+| Focal Tversky | $(1-\mathrm{TI})^{\gamma}$ | Emphasises hard examples for $\gamma<1$ |
+| Adversarial (LSGAN) | $\frac12\mathbb{E}[(D(x,\hat{y})-1)^2]$ | Learned, holistic plausibility term; needs a trained discriminator |
+@end
+
+@section[gan] Generative Adversarial Learning
+
+@subsection The adversarial game
+
+A generative adversarial network (GAN) consists of a generator $G$ and a discriminator $D$ trained in a two-player game [@gan]. In the original formulation $D$ is trained to distinguish real samples from generated ones and $G$ is trained to fool $D$:
+
+@eq gan-minimax
+\min_G \max_D \; V(D,G) = \mathbb{E}_{x\sim p_{\mathrm{data}}}\big[\log D(x)\big] + \mathbb{E}_{z\sim p_z}\big[\log\big(1-D(G(z))\big)\big].
+@end
+
+For a fixed generator the optimal discriminator is $D^{*}(x)=p_{\mathrm{data}}(x)/(p_{\mathrm{data}}(x)+p_g(x))$, and at this optimum the generator minimises the Jensen--Shannon divergence between the data and the generated distributions [@gan]. In practice the optimum is never reached, and the dynamics of simultaneous gradient descent on the two players are delicate [@mescheder].
+
+@subsection Conditional GANs and image-to-image translation
+
+In a conditional GAN both players observe a condition $x$ (here the MRI volume), so that the discriminator evaluates the *joint* plausibility of the pair $(x,y)$. The pix2pix framework combined this idea with a U-Net generator and a *PatchGAN* discriminator that classifies local patches of the output as real or fake, which constrains the statistics of local structure and yields a fully convolutional discriminator applicable to inputs of any size [@pix2pix]. The design is relevant here because a segmentation network is exactly an image-to-image mapping whose output is a label volume, and the discriminator can enforce local shape regularity of the label map that voxel-wise losses do not capture.
+
+@subsection Objectives and stabilisation
+
+The saturating logarithmic loss gives vanishing generator gradients when the discriminator is confident. The least-squares GAN (LSGAN) replaces it with a quadratic penalty that retains gradients for samples far on the wrong side of the decision boundary and has been reported to stabilise training [@lsgan]. The Wasserstein GAN replaces the divergence by an earth-mover distance, which requires a Lipschitz-constrained critic, enforced by weight clipping or by a gradient penalty [@wgan; @wgangp]. Spectral normalisation divides each weight matrix by its largest singular value, which constrains the Lipschitz constant of the discriminator at a low computational cost [@sn]. Further practical measures include label smoothing and one-sided label noise [@salimans], adding noise to the discriminator inputs (instance noise) to overlap the supports of the real and fake distributions [@arjovsky_bottou; @sonderby], and different learning rates for the two players [@ttur]. Transposed convolutions, used for up-sampling in generators, can introduce checkerboard artefacts unless kernel size and stride are compatible [@odena]. All of these measures are used in this thesis (Chapter 3), and their effect is probed in the sensitivity experiments.
+
+@section[gan-seg] Adversarial Training for Segmentation
+
+@subsection Adversarial segmentation in computer vision and medical imaging
+
+Luc *et al.* were the first to train a segmentation network jointly with an adversary that discriminates ground-truth label maps from predicted ones, adding the adversarial term to the multi-class cross-entropy; the authors report small but consistent gains on the Stanford Background and PASCAL VOC data sets (for example, a mean IoU of 54.3 against 51.3 on Stanford Background). In medical imaging, SegAN replaces the single score by a critic that compares multi-layer features of the image masked by the ground truth and of the image masked by the prediction, and optimises a multi-scale L1 loss; on the BRATS 2015 test set the authors report Dice scores of 0.85 (WT), 0.70 (TC) and 0.66 (ET) against 0.80, 0.63 and 0.64 for a U-Net baseline. Adversarial image-to-image networks have been used for liver segmentation [@gan_seg_liver], dilated convolutions with adversarial training for brain tissue segmentation [@moeskops], conditional adversarial networks for brain tumours [@rezaei], aggressive prostate cancer detection [@kohl] and multi-organ segmentation in thorax CT with a U-Net-GAN [@dong_ganseg]. @tab:ganseg collects these works.
+
+@fig lit-segan | file=figs/f_segan.png | width=6.0
+SegAN: the critic compares multi-layer features of the image multiplied by the predicted mask and of the image multiplied by the reference mask. Schematic redrawn by the author after [@segan].
+@end
+
+@fig:lit-segan shows the SegAN objective, and @tab:advcmp contrasts the two adversarial designs that are verifiable from the primary sources with the design of this thesis.
+
+@tab ganseg | widths=1.3,1.45,1.75,2.0 | align=llll | size=8.5
+Representative adversarial segmentation methods (numerical results are quoted only where they were verified against the primary source).
+| Work | Task / data | Adversary | Reported effect |
+| --- | --- | --- | --- |
+| Luc *et al.* [@luc] | Natural scenes (Stanford Background, PASCAL VOC) | CNN on label maps, BCE | Mean IoU 51.3 $\to$ 54.3 (Stanford Background); small gains on VOC |
+| SegAN [@segan] | Brain tumours, BRATS 2015 | Critic on masked images, multi-scale L1 | Dice 0.85/0.70/0.66 vs. 0.80/0.63/0.64 for U-Net (WT/TC/ET) |
+| Yang *et al.* [@gan_seg_liver] | Liver, CT | Adversarial image-to-image network | Effect not quoted here (see source) |
+| Moeskops *et al.* [@moeskops] | Brain tissue, MRI | Adversarial training with dilated convolutions | Effect not quoted here (see source) |
+| Rezaei *et al.* [@rezaei] | Brain tumours, MRI | Conditional adversarial network | Effect not quoted here (see source) |
+| Dong *et al.* [@dong_ganseg] | Thoracic organs, CT | U-Net generator, discriminator on masks | Effect not quoted here (see source) |
+@end
+
+@tab advcmp | widths=1.35,1.7,1.7,1.75 | align=llll | size=8.5
+Design of two adversarial segmentation methods and of the method of this thesis.
+| Aspect | Luc *et al.* [@luc] | SegAN [@segan] | This thesis |
+| --- | --- | --- | --- |
+| Data | Natural scenes, 2-D | BRATS 2013/2015, 2-D axial slices | 3-D multimodal volumes |
+| Adversary input | Label map (class probability maps or ground truth); image optional | Image multiplied by the predicted or the reference mask | Image volume and region probabilities (conditional) |
+| Adversarial objective | Binary cross-entropy, weight $\lambda$ | Multi-scale L1 between critic features | Least-squares (LSGAN) |
+| Stabilisation | Alternating schedule (500-iteration blocks) | Weight clipping, alternating updates | Spectral normalisation, instance noise, label smoothing, loss ramp |
+| Receptive field of the adversary | Whole label map | Critic features at several scales | Local patches ($70^3$ voxels) |
+@end
+
+@tab:advcmp shows that the proposed design differs from its predecessors less in the principle than in the three-dimensional, conditional, patch-based formulation and in the explicit stabilisation and monitoring of the discriminator.
+
+@subsection A critical appraisal
+
+Three observations temper the enthusiasm. First, the *strength of the baseline* varies between the studies. In several of them the non-adversarial reference is a plain network without the loss engineering and training recipe that later work has shown to account for most of the performance. An adversarial gain over a weak baseline does not establish a gain over a well-configured one. Second, the *effect size* is typically small in comparison with the variability that results from the choice of training split and random seed; without confidence intervals and a paired comparison it is difficult to assess whether the reported differences exceed this variability [@varoquaux; @mh_rankings]. Third, *discriminator diagnostics* are rarely reported. If the discriminator trivially separates real from predicted masks, for instance because soft probabilities are compared with crisp one-hot labels, its gradients carry no useful information, and the adversarial term acts as noise at best [@arjovsky_bottou; @mescheder]. The thesis therefore logs the discriminator's accuracy on real and fake inputs and uses input smoothing and noise to prevent this trivial separation (Chapter 3).
+
+A different use of GANs, distinct from adversarial refinement, is the *synthesis* of additional training data. GAN-based synthesis has been used to augment limited medical image sets for classification and segmentation and to anonymise data [@shin_synth; @fridadar; @bowles], and surveys document the breadth of applications in medical imaging [@yi_gan]. Synthetic augmentation is not part of the framework studied here: the adversarial component acts only as a refinement of the segmentation masks, which isolates one mechanism and makes its contribution measurable.
+
+@section[eval] Evaluation Metrics and Statistical Practice
+
+@subsection Overlap and distance metrics
+
+The Dice coefficient and the IoU are monotonically related, $\mathrm{Dice}=2\,\mathrm{IoU}/(1+\mathrm{IoU})$ for a single case, so that they induce the same ranking of cases but not of methods when averaged over cases [@taha; @eelbode]. The Hausdorff distance is the largest distance from a point of one surface to the other surface; because it is determined by a single outlier voxel it is replaced in the BraTS evaluation by a percentile, the HD95 [@hausdorff]. Overlap metrics depend strongly on the size of the target: the same absolute error of one voxel layer yields a much lower Dice for a small structure than for a large one. This size dependence and the handling of empty reference or empty predicted masks are well-known pitfalls, and the recommendations of the Metrics Reloaded framework call for explicit specification of both before an evaluation [@metricsreloaded; @reinke].
+
+@subsection Sample size, dependence and leakage
+
+Two features of medical imaging data sets make the interpretation of reported numbers difficult. The first is *dependence*: voxels within a volume, and slices within a patient, are highly correlated, so that treating slices as independent samples overstates the effective sample size. The Kish design effect $1+(m-1)\rho$, for clusters of size $m$ with intra-cluster correlation $\rho$, quantifies this inflation [@kish]. The second is *leakage*: information about the evaluation data that finds its way into training or model selection. Leakage occurs when slices or patches of the same patient appear in training and test partitions, when preprocessing parameters are estimated on the entire data set, and when hyper-parameters are tuned on the test set [@kaufman; @cawley; @oakden]. In all of these cases the measured performance is an estimate of the fit to known data rather than of generalisation.
+
+The small size of typical medical data sets also implies that cross-validated estimates carry wide error bars, so that differences of the magnitude reported between competing methods are frequently within the sampling variability [@varoquaux; @button]. For competitions, Maier-Hein *et al.* showed that rankings are sensitive to the choice of metrics, aggregation and test cases [@mh_rankings].
+
+@subsection Statistical comparison of methods
+
+Because the same test patients are segmented by every method, the appropriate comparisons are *paired*. The non-parametric bootstrap provides confidence intervals without distributional assumptions [@efron79; @efron_tib; @diciccio]; the Wilcoxon signed-rank test compares paired measurements without assuming normality [@wilcoxon]; multiplicity across several comparisons is controlled by the sequentially rejective Holm procedure [@holm]; and effect sizes such as Cliff's delta and Cohen's $d_z$ express the magnitude of a difference independently of the sample size [@cliff; @cohen]. These tools are standard in the comparison of classifiers over several data sets [@demsar; @dietterich], and Bayesian alternatives have been advocated to avoid the pitfalls of null-hypothesis tests [@benavoli]. The American Statistical Association cautions that a *p*-value neither measures the size of an effect nor the importance of a result [@asa]. The thesis follows these recommendations by reporting intervals and effect sizes alongside the tests, and by fixing the analysis before the experiments.
+
+@section[grading] Radiomic Grading of Gliomas
+
+Radiomics converts segmented regions into large sets of quantitative descriptors of shape, intensity and texture and relates them to clinical endpoints [@gillies; @aerts]. Open-source toolkits and a standardisation initiative address the dependence of feature values on implementation details [@pyradiomics; @ibsi]. Glioma grade classification on BraTS-like data has been studied with hand-crafted radiomic features and classical classifiers [@cho] and with automated pipelines that combine segmentation and grade prediction, sometimes also predicting molecular markers [@decuyper]. Two methodological aspects are of concern for any such pipeline. If the segmentation network is trained on the same patients on whom the classifier is evaluated, the masks of those patients are better than they would be for new patients, and the downstream accuracy is optimistic; this requires out-of-fold segmentation when the downstream model is trained on the segmenter's own training cases. Moreover, classification performance should be reported with confidence intervals and with calibration, since the area under the ROC curve [@hanley; @delong] is insensitive to the miscalibration that matters when a probability is used for decisions [@guo; @naeini]. Classical classifiers such as regularised logistic regression and gradient-boosted trees [@sklearn; @gbm] remain strong choices for the sample sizes involved.
+
+@tab gradecmp | widths=1.3,1.7,1.9,1.6 | align=llll | size=8.5
+Glioma grading studies on BraTS-type data and the grading experiment of this thesis.
+| Study | Data | Method | Reported result |
+| --- | --- | --- | --- |
+| Cho *et al.* [@cho] | BraTS 2017, 285 patients (210 HGG, 75 LGG) | 468 radiomic features from expert-annotated masks; five selected by mRMR; logistic regression, SVM, random forest | Test AUC 0.903 (mean over the three classifiers); five-fold CV AUC 0.940 |
+| Decuyper *et al.* [@decuyper] | Public and private cohorts | 3-D U-Net segmentation followed by classifiers for grade, IDH mutation and 1p/19q co-deletion | Fully automated pipeline; see source for the figures |
+| **This thesis** | BraTS 2020, 369 patients (295 development, 74 test) | 101 features from predicted masks; logistic regression and gradient boosting; leak-free out-of-fold protocol | AUC with bootstrap interval, calibration (ECE); pending on BraTS (Chapter 4) |
+@end
+
+@tab:gradecmp locates the grading experiment. The earlier BraTS-based study reports an average cross-validated AUC that exceeds its test AUC by about four points (0.940 against 0.903), which is the kind of optimism that a leak-free protocol is designed to avoid.
+
+@section[gaps] Summary and Research Gaps
+
+The review identifies six gaps. They define the contributions of the thesis and are mapped to its chapters in @tab:gaps.
+
+@tab gaps | widths=0.4,3.0,3.1 | align=cll | size=9
+Research gaps identified in the literature and the corresponding response of this thesis.
+| ID | Gap | Response |
+| --- | --- | --- |
+| G1 | Evaluation protocols are frequently under-specified (unit of splitting, whole-volume versus cropped evaluation, empty-region conventions) | Pre-specified patient-level protocol with automated leakage check and BraTS conventions (Sections @sec:data and @sec:eval-protocol) |
+| G2 | Components are proposed together; their individual contribution under an identical training recipe is rarely isolated | Ablation chain A0--A5 with common recipe and paired statistics (Sections @sec:exp-design and @sec:stats) |
+| G3 | The benefit of adversarial refinement is uncertain and discriminator behaviour is rarely reported | Logged discriminator diagnostics, stabilisation measures, sensitivity sweeps (Sections @sec:gan-model and @sec:exp-design) |
+| G4 | The asymmetric Tversky loss is used heuristically, without a link between its parameters and the gradient it produces | Derivation of gradient masses and of the recall--precision trade-off (Section @sec:losses) |
+| G5 | Segmentation-to-grade pipelines rarely control leakage between the segmenter and the classifier | Out-of-fold feature protocol and ground-truth-mask upper bound (Section @sec:grade) |
+| G6 | Uncertainty of metrics on a few hundred patients is rarely quantified | Bootstrap intervals, power and minimum detectable effect, coverage verification (Sections @sec:stats and Chapter 4) |
+@end

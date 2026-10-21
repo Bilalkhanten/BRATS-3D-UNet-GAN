@@ -1,0 +1,300 @@
+@section[gan-model] Adversarial Refinement
+
+@subsection Conditional discriminator and objectives
+
+The discriminator $D_\psi$ is a conditional three-dimensional PatchGAN [@pix2pix]. It receives the concatenation of the image (4 channels) and a three-channel mask $\mathbf{m}$, and outputs a map of patch scores. For a *real* pair the mask is the reference region map after label smoothing and noise, for a *fake* pair it is the generator's soft probability map $\mathbf{p}=\sigma(\mathbf{z})$ after the same noise:
+
+@eq d-inputs
+\mathbf{m}^{\mathrm{real}}=(1-s)\,\mathbf{y}+\tfrac{s}{2}+\boldsymbol{\eta},\qquad \mathbf{m}^{\mathrm{fake}}=\mathbf{p}+\boldsymbol{\eta}',\qquad \boldsymbol{\eta},\boldsymbol{\eta}'\sim\mathcal{N}(0,\sigma_\eta^2),
+@end
+
+with $s=0.05$ and $\sigma_\eta=0.05$. The generator output is passed *as probabilities, not thresholded*, so that the adversarial gradient can flow into the generator. With the least-squares formulation [@lsgan] the discriminator and the generator minimise
+
+@eq lsgan
+\mathcal{L}_D=\tfrac12\,\mathbb{E}\Big[\big(D(\mathbf{x},\mathbf{m}^{\mathrm{real}})-1\big)^2\Big]+\tfrac12\,\mathbb{E}\Big[D(\mathbf{x},\mathbf{m}^{\mathrm{fake}})^2\Big],\qquad
+\mathcal{L}_{\mathrm{adv}}=\tfrac12\,\mathbb{E}\Big[\big(D(\mathbf{x},\mathbf{p})-1\big)^2\Big],
+@end
+
+where expectations are over images, patches of the score map and noise. The total generator objective is
+
+@eq gen-total
+\mathcal{L}_G=\mathcal{L}_{\mathrm{seg}}^{\mathrm{DS}}+\lambda(t)\,\mathcal{L}_{\mathrm{adv}},\qquad \lambda(t)=\lambda_{\max}\,\min\Big\{1,\frac{t}{T_{\mathrm{ramp}}}\Big\},
+@end
+
+with $\lambda_{\max}=0.05$, and a linear warm-up over $T_{\mathrm{ramp}}$ equal to five epochs of iterations so that the discriminator is not confronted with an abruptly changing generator. The adversarial term is applied to the full-resolution output only. The hinge formulation, $\mathcal{L}_D=\tfrac12\mathbb{E}[\max(0,1-D(\cdot,\mathbf{m}^{\mathrm{real}}))]+\tfrac12\mathbb{E}[\max(0,1+D(\cdot,\mathbf{m}^{\mathrm{fake}}))]$ and $\mathcal{L}_{\mathrm{adv}}=-\mathbb{E}[D(\cdot,\mathbf{p})]$, is available as an alternative and is part of the sensitivity experiments.
+
+@fig gan | file=figs/d_gan.png | width=5.9
+Adversarial refinement: the segmentation network produces soft masks; the conditional 3D PatchGAN discriminator scores (image, mask) pairs; its output is combined with the segmentation loss through a ramped weight.
+@end
+
+@subsection Optimal discriminator and fixed point
+
+For fixed generator, denote by $p_r(\mathbf{v})$ and $p_g(\mathbf{v})$ the densities of real and fake (image, mask) pairs $\mathbf{v}$. Minimising $\mathcal{L}_D$ pointwise over the value $d=D(\mathbf{v})$ amounts to minimising $\tfrac12p_r(d-1)^2+\tfrac12p_gd^2$, whose derivative $p_r(d-1)+p_gd$ vanishes at
+
+@eq d-opt
+D^*(\mathbf{v})=\frac{p_r(\mathbf{v})}{p_r(\mathbf{v})+p_g(\mathbf{v})} .
+@end
+
+This is the same optimal discriminator as for the original GAN. It equals $\tfrac12$ everywhere if and only if $p_g=p_r$, which is the fixed point of the game: a generator that reproduces the joint distribution of images and reference masks cannot be told apart. At this fixed point the adversarial gradient on the generator vanishes in expectation, so that the adversarial term cannot pull the generator away from a segmentation that is already indistinguishable from the reference. Away from the fixed point, $\mathcal{L}_{\mathrm{adv}}$ with $D=D^*$ equals $\tfrac12\mathbb{E}_{p_g}[(p_g/(p_r+p_g))^2]$, which decreases as the fake density moves towards regions of high real density; the generator is therefore driven towards the support of the reference masks. For the coding used by Mao *et al.* ($a=-1$, $b=1$, $c=0$) the objective is exactly the Pearson $\chi^2$ divergence between $p_r+p_g$ and $2p_g$ [@lsgan]; for the $0/1$ coding used here, the optimal discriminator and the fixed point are the same, but the identification with a divergence does not hold exactly, and the form is adopted for its empirical stability.
+
+@subsection The trivial-separation pitfall and its remedies
+
+If the real masks are binary, $\mathbf{y}\in\{0,1\}$, and the generator outputs probabilities in $(0,1)$, the discriminator can separate the two classes by a feature that carries no anatomical information: *sharpness*, i.e. the distance of the mask values from $\{0,1\}$. Formally, the supports of $p_r$ and $p_g$ are then (nearly) disjoint and a perfect discriminator exists; such a discriminator has gradients that are uninformative for the generator [@arjovsky_bottou]. The training therefore combines four measures: (i) *label smoothing* of the real masks to $\{s/2,1-s/2\}$, which moves the support of the real masks into the interior of the interval; (ii) *instance noise* on both inputs, which makes the supports overlap [@sonderby]; (iii) *spectral normalisation* of all discriminator layers, which bounds the Lipschitz constant and hence the confidence of the discriminator [@sn]; (iv) a small adversarial weight $\lambda_{\max}$ with a warm-up. The diagnostic of success is the discriminator accuracy: the fraction of real patch scores above $1/2$ and of fake patch scores below $1/2$ are logged at every epoch. If the latter approaches one while the former also approaches one, the discriminator has won and the adversarial term is not informative; this is one of the outcomes that the experiments look for (Section @sec:v10 of Chapter 4).
+
+@subsection Architecture of the discriminator
+
+The discriminator consists of four convolutional layers with kernel size four and strides $(2,2,2,1)$ and $(32,64,128,256)$ channels with leaky rectifier of slope $0.2$, followed by a final convolution to one channel; all convolutions are spectrally normalised, and no normalisation layers are used. By the recursion of @eq:rf its receptive field is 70 voxels per axis, so that it judges local blocks of the mask rather than the entire patch; for an input of $128^3$ voxels it produces a map of $14^3$ patch scores. The number of its trainable parameters is reported in @tab:cx of Chapter 4.
+
+@fig disc | file=figs/m_disc.png | width=6.3
+The conditional 3-D PatchGAN discriminator for a $128^3$ patch: the image and the three region maps are concatenated into seven channels, four strided convolutions with spectral normalisation reduce the resolution, and the last convolution produces a $14^3$ map of patch scores.
+@end
+
+@algo disc
+Discriminator forward pass and its two uses in one iteration.
+Input: image x (4 channels), region map m (3 channels: real = smoothed reference, fake = generator probabilities)
+h <- concat( x, m )                                           # 7 channels
+for (c, s) in [(32, 2), (64, 2), (128, 2), (256, 1)]:
+    h <- LeakyReLU_0.2( SpectralNorm( Conv4( h; channels = c, stride = s, padding = 1 ) ) )
+score <- SpectralNorm( Conv4( h; channels = 1, stride = 1, padding = 1 ) )          # 14 x 14 x 14 patch scores
+D step:   m_real <- 0.95 y + 0.025 + N(0, 0.05^2);   m_fake <- stopgrad( p ) + N(0, 0.05^2)
+          L_D <- 1/2 E[ (D(x, m_real) - 1)^2 ] + 1/2 E[ D(x, m_fake)^2 ]
+G step:   L_G <- 1/2 E[ (D(x, p) - 1)^2 ];   total generator loss  L_seg + lambda_t L_G
+@end
+
+@fig:disc and @alg:disc describe the adversary. Every one of the 2,744 scores in the output map judges a block of $70^3$ voxels, and the mean of the squared deviations from the target is the LSGAN loss. The noise and the smoothing of the real maps are the remedies of the previous subsection; the generator step differentiates through $D$ with respect to the probabilities $p$ only.
+
+@section[optim] Optimisation and Training Schedule
+
+@subsection Optimiser and schedule
+
+The generator is optimised with AdamW [@adam; @adamw] with learning rate $\eta_0=3\times10^{-4}$ and weight decay $10^{-5}$. The learning rate decays polynomially [@deeplab],
+
+@eq poly
+\eta(e)=\eta_0\Big(1-\frac{e}{E}\Big)^{0.9},
+@end
+
+where $e$ is the epoch and $E$ the total number of epochs. An *epoch* is defined as 250 iterations of batch size two, i.e. it is not a pass through the data; this is the convention of the nnU-Net family and keeps the schedule independent of the data set size. The total number of epochs is $E=E_{\mathrm{seg}}+E_{\mathrm{adv}}=300+50$ for all variants, so that variants with and without the adversarial term perform the same number of generator updates (87,500). Gradients are clipped to a global norm of 12 [@gradclip]. On a GPU the forward and backward passes use bfloat16 automatic mixed precision [@amp], whereas the loss and the discriminator losses are computed in single precision. The discriminator uses Adam with learning rate $2\times10^{-4}$ and momentum parameters $(0.5,0.999)$ [@adam], one update per generator update.
+
+@fig schedule | file=figs/m_schedule.png | width=6.3
+The schedules of the training: (a) the polynomial decay of the learning rate over the 350 epochs, (b) the linear warm-up of the adversarial weight to $\lambda_{\max}=0.05$ over five epochs, and (c) the two stages of training.
+@end
+
+@subsection Two-stage training
+
+Training proceeds in two stages. In the *supervised stage* ($E_{\mathrm{seg}}$ epochs) the generator is trained with $\mathcal{L}_{\mathrm{seg}}^{\mathrm{DS}}$ alone. In the *adversarial stage* ($E_{\mathrm{adv}}$ epochs, variants with GAN only) the discriminator is created and trained jointly with the generator according to @eq:gen-total. The rationale is the standard one for adversarial refinement: an adversary can only judge plausibility meaningfully when the generator already produces plausible masks, and an adversarial signal on a random generator would be dominated by trivial cues. @alg:train summarises the procedure.
+
+@algo train
+Training procedure (one fold).
+Input: training patients P_train, validation patients P_val, config
+G <- build_model(config);  opt_G <- AdamW(G);  D <- None
+for epoch e = 0 .. E-1:
+    stage <- "adv" if (gan and e >= E_seg) else "seg"
+    if stage == "adv" and D is None:  D, opt_D <- new Discriminator, Adam
+    set lr by Eq. (poly)
+    repeat 250 iterations:
+        (x, y) <- sample patch batch (foreground-biased, 128^3, batch 2)
+        (x, y) <- augment(x, y)                       # GPU
+        z <- G(x)                                     # list of 3 logits if deep supervision
+        L <- L_seg^DS(z, y)
+        if stage == "adv":
+            p <- sigmoid(z[0]);  m_real <- smooth(y) + noise;  m_fake <- p + noise
+            update D on  L_D(D(x, m_real), D(x, stopgrad(m_fake)))
+            L <- L + lambda(t) * L_adv(D(x, p))      # lambda ramps up linearly
+        clip_grad_norm(G, 12);  update G with L
+    every 5 epochs: validate (sliding window, hierarchy); keep best checkpoint by mean Dice
+Output: G* = best checkpoint (selected on P_val, never on the test set)
+@end
+
+@fig iteration | file=figs/m_iteration.png | width=6.2
+Data flow of one iteration of the adversarial stage: the discriminator step uses the smoothed reference and the detached generator probabilities, the generator step combines the segmentation loss with the weighted adversarial term.
+@end
+
+@fig:iteration shows the data flow of @alg:train for the adversarial stage. In the supervised stage the right-hand and lower branches are absent and the generator is updated by $\mathcal{L}_{\mathrm{seg}}^{\mathrm{DS}}$ alone.
+
+@subsection Model selection
+
+Every five epochs the model is evaluated on the validation fold by sliding-window inference with 50% overlap, and the mean of the three region Dice scores is computed. The checkpoint with the highest value is retained. Model selection thus uses the validation fold only, and the common test set is used exactly once, for the final evaluation of the selected checkpoint. Because the checkpoint may come from either stage, a variant with an adversarial term cannot be penalised for an adversarial stage that degrades the model, nor can it benefit from one that improves it beyond the best checkpoint of the supervised stage unless the validation score confirms it; the epoch of the best checkpoint is logged and reported.
+
+@section[infer] Inference
+
+@subsection Gaussian-weighted sliding window
+
+Whole volumes are processed by a sliding window of the patch size, with a stride of half the patch size (50% overlap). Window positions along an axis of length $n$ are $0,\Delta,2\Delta,\dots$ with $\Delta=\lfloor(1-\rho)P\rfloor$ for overlap $\rho$ and patch size $P$, with a final window flush against the border, so that every voxel is covered. Volumes smaller than the patch are zero-padded. Predictions of overlapping windows are combined with Gaussian importance weights that emphasise the centre of each window, where the effective receptive field is largest,
+
+@eq gauss-w
+w(\mathbf{u})=\exp\Big(-\sum_{a=1}^{3}\frac{(u_a-c_a)^2}{2\,(P/8)^2}\Big),\qquad \mathbf{p}(v)=\frac{\sum_{k}w(v-o_k)\,\sigma\big(\mathbf{z}_k(v-o_k)\big)}{\sum_{k}w(v-o_k)},
+@end
+
+where $o_k$ is the origin of window $k$, $\mathbf{c}$ the window centre, and the sums run over the windows that contain $v$. The weights are clamped from below at $10^{-4}$ to avoid division by zero at the corners. Optionally, test-time augmentation averages the probabilities over the eight mirrorings of the window; it is not used in the primary experiments. The number of windows for a given volume size is computed exactly in @tab:win of Chapter 4.
+
+@fig window | file=figs/m_window.png | width=6.3
+Sliding-window inference: (a) the Gaussian importance map ($\sigma=P/8$), (b) the window positions along one axis of length 200 for $P=128$ and 50% overlap (starts 0, 64 and 72, the last window being flush with the border) together with the total weight, and (c) the window grid in one slice.
+@end
+
+@algo infer
+Sliding-window inference for one case.
+Input: preprocessed volume x~ (4 x D x H x W), model G, patch size P = 128, overlap rho = 0.5
+pad x~ with zeros to at least P along every axis
+for each axis: starts <- 0, Delta, 2 Delta, ... (Delta = floor((1 - rho) P)),  plus the last start n - P if not yet included
+w(u) <- exp( - sum_a (u_a - c_a)^2 / (2 (P/8)^2) );   w <- max( w, 1e-4 )
+num <- 0;  den <- 0                                           # accumulators of size 3 x D x H x W and D x H x W
+for each window origin o in starts_D x starts_H x starts_W:
+    p_o <- sigmoid( G( x~[o : o + P] ) )
+    num[o : o + P] += w * p_o;   den[o : o + P] += w
+p <- num / den;   crop back to the unpadded size
+r <- ( p > 0.5 );   TC <- TC and WT;   ET <- ET and TC       # hierarchy projection
+paste r into the original voxel grid using the stored crop box
+Output: binary region masks WT, TC, ET
+@end
+
+@fig:window and @alg:infer give the complete procedure. For the first axis of length 200 the window starts are 0, 64 and 72; the total weight of the overlapping windows stays between $3.8\times10^{-4}$ at the extreme corner voxels and 1.94 in the interior, so that the normalisation by the accumulated weight is essential.
+
+@subsection From probabilities to regions
+
+The probability maps are thresholded at $1/2$ and projected onto the hierarchy by @eq:hierarchy. No further post-processing (such as removal of small connected components or relabelling of small enhancing tumours as necrosis) is applied, because such rules are heuristics tuned on particular data sets and would confound the comparison of the model variants. The effect of a simple post-processing step can be investigated separately without retraining.
+
+@section[grade] LGG/HGG Grade Classification
+
+@subsection Segmentation-derived features
+
+For a case with predicted regions $\hat{\mathbf{y}}$ the compartments WT, TC, ET, NCR $=\mathrm{TC}\setminus\mathrm{ET}$ and ED $=\mathrm{WT}\setminus\mathrm{TC}$ are formed, and a vector of 101 features is computed from the *predicted* masks and the normalised images: (i) the logarithm of the volume of each of the five compartments (5 features); (ii) the volume ratios ET/WT, ET/TC, TC/WT, NCR/TC and ED/WT (5); (iii) for WT, TC and ET the sphericity $\Psi=\pi^{1/3}(6V)^{2/3}/A$ with the volume $V$ and surface area $A$ (the latter estimated from the count of boundary voxels), the extent (volume divided by the volume of the bounding box) and the maximal bounding-box diameter (9 features); (iv) the mean, standard deviation and the 10th and 90th percentiles of the intensity of each modality inside each compartment (80 features); and (v) the enhancement contrast, the difference between the mean T1ce and the mean T1 intensity inside ET and inside TC (2 features). These descriptors encode the characteristics that radiologists associate with higher grade, namely larger enhancing and necrotic components and stronger contrast enhancement [@who2016; @cho; @gillies]. Empty compartments give zero-valued features.
+
+@fig features | file=figs/m_features.png | width=6.2
+Composition of the 101-dimensional feature vector used for the grade classification.
+@end
+
+@subsection Classifiers
+
+Two classifiers are compared: an $\ell_2$-regularised logistic regression on standardised features, with the inverse regularisation strength $C\in\{0.01,0.03,0.1,0.3,1,3\}$ selected by an inner five-fold cross-validation maximising the AUC, and a gradient-boosted tree ensemble of depth three (200 iterations, learning rate 0.05) [@sklearn; @gbm]. Both use balanced class weights because the classes are unbalanced (about four HGG for each LGG).
+
+@subsection Leak-free protocol
+
+The segmentation network of fold $k$ has been trained on the patients of the other four folds. Its predictions on those patients are therefore *in-sample* and unusually good, while its predictions on new patients are *out-of-sample*; a classifier trained on in-sample features would encounter a distribution shift at test time. The protocol of @fig:protocol (@alg:grade) avoids this by using only out-of-fold features:
+
+@algo grade
+Grade-classification protocol with out-of-fold (OOF) predicted masks.
+for fold k = 0..4:
+    for patient i in fold k:    mask_i <- G_k(image_i)          # G_k never saw patient i
+                                u_i <- features(image_i, mask_i)
+for fold k = 0..4:
+    train classifier on {u_i : i not in fold k};  predict {u_i : i in fold k}   # CV estimate
+train final classifier on all OOF features {u_i}
+for test patient j:
+    u_j^k <- features(image_j, G_k(image_j)) for k = 0..4
+    score_j <- mean_k  classifier(u_j^k)                         # fold-model ensemble
+report AUC, accuracy, sensitivity, specificity, ECE with bootstrap CIs
+repeat with ground-truth masks instead of predicted masks   # upper bound
+@end
+
+The ground-truth upper bound repeats the same procedure with the reference masks and shows how much classification accuracy is lost to segmentation error.
+
+@section[eval-protocol] Evaluation Protocol
+
+@subsection Segmentation metrics
+
+For each patient and region the following quantities are computed from the thresholded, hierarchy-projected prediction $\hat{y}$ and the reference $y$ on the original voxel grid, using the voxel counts $\mathrm{TP}=|\hat{y}\cap y|$, $\mathrm{FP}=|\hat{y}\setminus y|$, $\mathrm{FN}=|y\setminus\hat{y}|$ and $\mathrm{TN}$:
+
+@eq metrics
+\mathrm{Dice}=\frac{2\,\mathrm{TP}}{2\,\mathrm{TP}+\mathrm{FP}+\mathrm{FN}},\quad
+\mathrm{IoU}=\frac{\mathrm{TP}}{\mathrm{TP}+\mathrm{FP}+\mathrm{FN}},\quad
+\mathrm{Prec}=\frac{\mathrm{TP}}{\mathrm{TP}+\mathrm{FP}},\quad
+\mathrm{Sens}=\frac{\mathrm{TP}}{\mathrm{TP}+\mathrm{FN}},\quad
+\mathrm{Spec}=\frac{\mathrm{TN}}{\mathrm{TN}+\mathrm{FP}} .
+@end
+
+The Hausdorff distance of 95% is computed from the surfaces $\partial\hat{y}$ and $\partial y$ (voxels of the mask with at least one 6-connected neighbour outside the mask) using Euclidean distance transforms with the voxel spacing,
+
+@eq hd95
+\mathrm{HD95}(\hat{y},y)=\mathrm{P}_{95}\Big(\big\{\,d(a,\partial y):a\in\partial\hat{y}\,\big\}\cup\big\{\,d(b,\partial\hat{y}):b\in\partial y\,\big\}\Big),
+@end
+
+i.e. the 95th percentile of the pooled set of directed surface distances (not the larger of the two directed percentiles). The conventions of the BraTS challenge are used for empty masks [@brats18; @metricsreloaded]: if both masks are empty, $\mathrm{Dice}=1$ and $\mathrm{HD95}=0$; if exactly one mask is empty, $\mathrm{Dice}=0$ and HD95 is set to the penalty $\sqrt{240^2+240^2+155^2}\approx373.13$ mm, the diagonal of the volume. Precision and sensitivity follow the analogous convention (value one if the corresponding denominator is zero and no error occurred, zero otherwise). Because empty ET is a frequent case among LGG patients, the number of such cases is reported separately, since their treatment can dominate the mean of ET Dice and HD95.
+
+@fig metrics | file=figs/m_metrics.png | width=6.2
+The segmentation metrics on a synthetic example: (a) reference (green) and prediction (orange) in one slice, (b) the voxel counts behind the Dice and IoU values (TP = 5,997, FP = 2,191, FN = 524; Dice 0.815, IoU 0.688), and (c) the histogram of the pooled directed surface distances (3,090 surface voxels; HD95 = 3.0, maximum 24.4 voxels).
+@end
+
+@fig:metrics illustrates why the 95th percentile is used: a single maximal distance of 24.4 voxels would dominate the Hausdorff distance, whereas the 95th percentile of the pooled distances is 3.0 voxels and describes the typical boundary error.
+
+@subsection Aggregation
+
+Metrics are computed per patient and aggregated by the arithmetic mean over patients (each patient counts once, whatever the tumour size). The *composite* score $\mathrm{Dice}_{\mathrm{mean}}$ is the mean over the three regions. In addition to means, medians and interquartile ranges are reported, since the distribution of per-patient scores is left-skewed by a few failures. For classification, the area under the ROC curve (AUC), accuracy, sensitivity, specificity, balanced accuracy and the expected calibration error (ECE) with ten equal-width bins [@naeini; @guo] are reported.
+
+@section[stats] Statistical Analysis
+
+All statistics are computed on patient-level values and are specified here, before the experiments.
+
+*Confidence intervals.* For a mean over $n$ patients, the 95% interval is the percentile bootstrap interval from $B=10{,}000$ resamples of the patients with replacement [@efron79; @diciccio]. For a paired comparison of two models evaluated on the same patients with scores $a_i$ and $b_i$, the same procedure is applied to the differences $d_i=a_i-b_i$.
+
+*Tests.* The two-sided Wilcoxon signed-rank test is applied to the paired differences [@wilcoxon]. When several comparisons belong to one hypothesis (for example, the four steps of the ablation chain in H1), the *p*-values are adjusted by the Holm step-down procedure, which controls the family-wise error rate without assuming independence [@holm]. Results are declared significant at the 0.05 level after adjustment; this threshold is used for decisions about the hypotheses H1 to H5 only, and the *p*-values are reported together with the effect sizes and intervals, not instead of them [@asa].
+
+*Effect sizes.* Cliff's delta, $\delta=\big(\#\{a_i>b_j\}-\#\{a_i<b_j\}\big)/n^2$ [@cliff], and the standardised paired difference $d_z=\bar{d}/s_d$ [@cohen] are reported.
+
+*Non-inferiority (H5).* The full model is declared non-inferior to the baseline if the upper limit of the 95% interval of the paired difference (baseline minus full) of $\mathrm{Dice}_{\mathrm{mean}}$ is below the margin $\delta=0.01$.
+
+*Classification.* The AUC and the accuracy have 95% bootstrap intervals from 5,000 bootstrap replicates of the patients (replicates with a single class are discarded); AUCs of two classifiers on the same patients can be compared by a paired bootstrap of the AUC difference [@hanley; @delong].
+
+*Power and precision.* For a paired comparison with $n$ patients, a standard deviation $\sigma_d$ of the differences, two-sided level $0.05$ and power $0.8$, the minimum detectable difference is
+
+@eq mde
+\mathrm{MDE}=\big(z_{1-0.05/2}+z_{0.8}\big)\,\frac{\sigma_d}{\sqrt n}\approx 2.80\,\frac{\sigma_d}{\sqrt n},
+@end
+
+which is evaluated for the test set of 74 patients in Chapter 4, so that small observed differences can be interpreted in terms of what the design could have detected [@button]. The coverage of the bootstrap interval for skewed Dice-like distributions is verified by simulation (Chapter 4), and the dependence between slices of a patient, which would make slice-level analyses anticonservative, is quantified by the design effect [@kish].
+
+@section[exp-design] Experimental Design
+
+@subsection Ablation chain and sensitivity analyses
+
+The ablation chain adds one component at a time to the plain 3D U-Net. All variants use the same data, optimiser, schedule, augmentation, deep supervision, number of generator updates and inference. @tab:abl lists the variants.
+
+@tab abl | widths=0.6,1.9,0.6,0.7,0.7,0.7,0.7 | align=llccccc | size=8.5
+Model variants of the ablation chain. Res: residual blocks; AG: attention gates; MAF: modality-attentive fusion; Tv: Tversky term ($\alpha=0.3$, $\beta=0.7$); GAN: adversarial refinement.
+| ID | Description | Res | AG | MAF | Tv | GAN |
+| --- | --- | --- | --- | --- | --- | --- |
+| A0 | Plain 3D U-Net (Dice + BCE) | -- | -- | -- | -- | -- |
+| A1 | + residual blocks | yes | -- | -- | -- | -- |
+| A2 | + attention gates | yes | yes | -- | -- | -- |
+| A3 | + modality-attentive fusion | yes | yes | yes | -- | -- |
+| A4 | + Tversky loss | yes | yes | yes | yes | -- |
+| A5 | + adversarial refinement (full model) | yes | yes | yes | yes | yes |
+@end
+
+Six *sensitivity* runs probe the design choices that are most uncertain: the adversarial weight $\lambda_{\max}\in\{0.01,0.2\}$ (the default being 0.05), the hinge instead of the least-squares loss, the removal of label smoothing and instance noise (the trivial-separation condition), the symmetric Tversky setting $\alpha=\beta=0.5$ (which isolates the effect of the asymmetry in H2) and the more asymmetric setting $(0.2,0.8)$.
+
+@subsection Tiers and baseline
+
+The experiments are organised in three tiers of increasing optional cost. *Tier 1* (required for the central claims) trains A0 and A5 on all five folds, which yields five-fold cross-validation estimates for the baseline and the full model, out-of-fold predictions for the grade classifier, and five model versions for the test-set ensemble statistics. *Tier 2* trains A1 to A4 on fold 0 only, which, together with A0 and A5 on fold 0, completes the ablation chain on a single partition and a common test set. *Tier 3* trains the six sensitivity runs on fold 0. The ablation and sensitivity comparisons are evaluated on the common test set of 74 patients.
+
+As an external reference, nnU-Net is trained with its default 3D full-resolution configuration on the same patient partitions (the same five folds and the same test set), with the region-based labels of the BraTS configuration; the export script of the code base converts the data and the splits into the nnU-Net format. The baseline is intended to answer H5 under the same patient partition, not to reproduce a challenge result.
+
+@note | title=Seeds and replication
+Each configuration of Tiers 1 to 3 is trained once with seed 42. Variation due to random initialisation and patch sampling is therefore *not* separated from the effect of the compared component in the BraTS experiments, and this is listed among the limitations in Chapter 5; the confidence intervals reflect the sampling variability of the test patients only. For the verification study on phantoms (Chapter 4), where each run is cheap, two seeds are used per variant.
+@end
+
+@section[impl] Implementation and Reproducibility
+
+The framework is implemented in Python with PyTorch [@pytorch]; classical machine learning and statistics use scikit-learn and SciPy [@sklearn]. @tab:code maps the sections of this chapter to the modules of the code base.
+
+@tab code | widths=1.9,2.3,2.3 | align=lll | size=9
+Correspondence between the methodology and the code base.
+| Topic | Module | Section |
+| --- | --- | --- |
+| Normalisation, cropping, patient-level splits, leakage check | data.py, scripts/prepare_data.py | Data and preprocessing |
+| Patch sampling and augmentation | data.py (PatchStream), augment.py | Patch sampling and augmentation |
+| Backbone, attention gate, MAF, discriminator | models.py | Network architecture; Adversarial refinement |
+| Dice, Tversky, BCE, deep supervision, adversarial losses | losses.py | Loss functions; Adversarial refinement |
+| Two-stage training, model selection | train.py, config.py | Optimisation |
+| Sliding-window inference | infer.py | Inference |
+| Metrics with BraTS conventions | metrics.py, evaluate.py | Evaluation protocol |
+| Grade features and classifier | features.py, scripts/grade_classification.py | Grade classification |
+| Bootstrap, tests, effect sizes, calibration | stats.py | Statistical analysis |
+| Parameter and MAC counting | complexity.py | Complexity |
+| Synthetic phantoms | synthetic.py | Chapter 4 (verification) |
+@end
+
+Each experiment is defined by one JSON file that overrides a documented set of defaults and is copied into the run directory together with the log of every epoch, so that every table of Chapter 4 can be traced back to a configuration. Pseudo-random generators of Python, NumPy and PyTorch are seeded; bitwise-deterministic execution on a GPU is optional because it is slower. A suite of 23 automated tests checks the metrics against hand-computed values, the losses against finite-difference gradients, the shapes and the behaviour of the networks, the sliding-window reconstruction, the absence of patient overlap between partitions, the normalisation, and the statistical routines. The tests and the end-to-end smoke test are run before any experiment.
+
+@section Summary of the Chapter
+
+This chapter formalised the segmentation and grading problems; specified the data handling and the leak-free partitioning; derived the properties of the architectural components (attention gates, modality-attentive fusion) and of the loss functions (gradient mass under imbalance, the Tversky cost ratio and its F-measure equivalence, the Dice--IoU feasibility region, the optimal discriminator and the trivial-separation pitfall); described training, inference, grade classification, evaluation and statistical analysis; and defined the experimental design with its hypotheses. Chapter 4 first verifies that the implementation behaves as the theory predicts, then reports the BraTS experiments.

@@ -1,0 +1,8 @@
+{
+  "name": "a4_tversky",
+  "residual": true,
+  "attention": true,
+  "fusion": "maf",
+  "gan": false,
+  "w_tv": 1.0
+}

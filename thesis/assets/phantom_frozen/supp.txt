@@ -1,0 +1,28 @@
+
+@section[d-ph] Supplementary Tables of the Phantom Study
+
+@tab ph-seed | widths=0.5,0.5,0.8,0.8,0.8,0.9,0.7,0.8,0.9 | align=ccccccccc | size=8
+Test results of every phantom run (fold 0; 20 test phantoms). HD95 in voxels, mean over regions; best epoch: epoch of the selected checkpoint; time: total training time in minutes on two CPU cores.
+| Variant | Seed | Dice WT | Dice TC | Dice ET | Dice mean | HD95 | Best epoch | Time (min) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A0 | 1 | 0.9983 | 0.9880 | 0.9984 | 0.9949 | 0.090 | 27 | 9.1 |
+| A0 | 2 | 0.9989 | 0.9957 | 0.9984 | 0.9977 | 0.064 | 27 | 9.0 |
+| A1 | 1 | 0.9998 | 0.9982 | 1.0000 | 0.9993 | 0.017 | 27 | 10.3 |
+| A1 | 2 | 0.9990 | 0.9979 | 1.0000 | 0.9990 | 0.033 | 23 | 10.2 |
+| A2 | 1 | 0.9999 | 0.9991 | 1.0000 | 0.9997 | 0.017 | 19 | 12.6 |
+| A2 | 2 | 0.9999 | 0.9991 | 1.0000 | 0.9996 | 0.017 | 27 | 11.5 |
+| A3 | 1 | 0.9998 | 0.9967 | 0.9995 | 0.9987 | 0.033 | 23 | 14.1 |
+| A3 | 2 | 0.9998 | 0.9989 | 1.0000 | 0.9995 | 0.017 | 27 | 13.4 |
+| A4 | 1 | 0.9992 | 0.9975 | 1.0000 | 0.9989 | 0.033 | 27 | 30.0 |
+| A4 | 2 | 0.9996 | 0.9983 | 0.9989 | 0.9989 | 0.017 | 27 | 13.4 |
+| A5 | 1 | 0.9990 | 0.9971 | 1.0000 | 0.9987 | 0.033 | 27 | 16.7 |
+| A5 | 2 | 0.9994 | 0.9978 | 0.9995 | 0.9989 | 0.017 | 27 | 13.5 |
+@end
+
+@tab ph-dacc | widths=0.8,1.6,1.6,1.4,1.7 | align=ccccc | size=8.5
+Discriminator diagnostics of the full model per seed, averaged over the adversarial epochs.
+| Seed | Accuracy on real maps | Accuracy on generated maps | $D$ loss | Adversarial loss of $G$ |
+| --- | --- | --- | --- | --- |
+| 1 | 0.874 | 0.952 | 0.0749 | 0.4168 |
+| 2 | 0.887 | 0.959 | 0.0655 | 0.4146 |
+@end

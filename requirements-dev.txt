@@ -1,0 +1,6 @@
+-r requirements.txt
+ruff
+pytest-cov
+pre-commit
+jupyter
+nbformat

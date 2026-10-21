@@ -1,0 +1,109 @@
+@section[phantom] Synthetic Phantom Study
+
+The second kind of evidence is an end-to-end run of the complete training and evaluation pipeline on synthetic data with known ground truth. Its purpose is to establish that the pipeline, as implemented, learns, converges, evaluates, aggregates and tests as designed; it is not intended to rank the model variants for brain tumours (see the note in Section @sec:r-overview).
+
+@subsection[ph-design] Design
+
+One hundred phantoms of $48^3$ voxels were generated with the generator described in Appendix @app:phantom-gen: 75 are labelled HGG-like and 25 LGG-like, with an ellipsoidal brain with three tissue classes, four MR-like contrasts, a smooth multiplicative bias field, Rician-like noise, and a nested tumour (necrotic core, enhancing shell, oedema) written with the BraTS labels $\{1,2,4\}$. HGG-like phantoms have a strongly enhancing shell and a large core, LGG-like phantoms weak or absent enhancement. @fig:ph-examples shows two examples. The phantoms were split at the level of the phantom with the same code as for BraTS: a grade-stratified test set of 20 phantoms and three cross-validation folds on the remaining 80; only fold 0 was trained.
+
+@fig ph-examples | file={ASSETFIG}/phantom_examples.png | width=6.2
+Two synthetic phantoms (upper row: HGG-like, lower row: LGG-like). From left to right: T1, T1ce, T2, FLAIR, and the ground-truth labels.
+@end
+
+The network variants A0 to A5 are the cumulative steps of the ablation of Chapter 3 (A0, A1, A2, A3, A4, A5 available in this build), each built with 4 levels, 8 base channels (at most 64) and trained for 20 epochs of 50 iterations with batch size 2 on $48^3$ patches (A5 adds 8 adversarial epochs; the other variants are trained for the same total number of generator updates), AdamW with learning rate $10^{-3}$, on the CPU in single precision. The width and depth are therefore much smaller than the BraTS configuration of Chapter 3 (base width 32, depth 5), but the code path is the same. Each variant was trained with seed(s) 1, 2; where several seeds exist the per-phantom metrics are averaged over seeds before any statistic is computed, so that the unit of analysis remains the phantom.
+
+@subsection[ph-res] Segmentation accuracy on the held-out phantoms
+
+@tab:ph-main lists the accuracy on the 20 test phantoms. All variants reach a mean Dice above 0.996 for the average over the three regions; the largest difference between the means of any two variants is 0.0034 (A2 against A0), and the lowest Dice of any single test phantom and variant is 0.973. The task is therefore close to saturation: phantoms contain no anatomy, no artefacts and no label ambiguity, and the contrast between the tumour compartments is large compared with the noise. Under these conditions the pipeline can be shown to work, but it cannot discriminate between architectures, and the differences below must not be interpreted as evidence about the value of any component.
+
+@tab ph-main | widths=1.75,0.5,0.75,0.75,0.75,1.35,0.7,0.7 | align=lcccccrc | size=8
+Test results of the phantom study (fold 0, 20 test phantoms). Per-phantom metrics are averaged over seeds; the interval is a 95% bootstrap interval of the mean over phantoms. HD95 in voxels (mean over WT, TC, ET). Last column: standard deviation of the mean Dice between seeds.
+| Variant | Seeds | Dice WT | Dice TC | Dice ET | Dice mean [95% CI] | HD95 | SD seeds |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A0 Plain 3D U-Net | 2 | 0.9986 | 0.9919 | 0.9984 | 0.9963 [0.9931, 0.9985] | 0.08 | 0.0019 |
+| A1 + residual blocks | 2 | 0.9994 | 0.9981 | 1.0000 | 0.9992 [0.9978, 0.9999] | 0.03 | 0.0003 |
+| A2 + attention gates | 2 | 0.9999 | 0.9991 | 1.0000 | 0.9997 [0.9991, 1.0000] | 0.02 | 0.0000 |
+| A3 + MAF stem | 2 | 0.9998 | 0.9978 | 0.9997 | 0.9991 [0.9979, 0.9999] | 0.03 | 0.0006 |
+| A4 + Tversky loss | 2 | 0.9994 | 0.9979 | 0.9995 | 0.9989 [0.9974, 0.9998] | 0.03 | 0.0000 |
+| A5 + adversarial term (full) | 2 | 0.9992 | 0.9974 | 0.9997 | 0.9988 [0.9972, 0.9998] | 0.03 | 0.0002 |
+@end
+
+@tab:ph-steps gives the paired differences between successive variants. Of the 5 comparisons, 4 have a bootstrap interval that excludes zero, and the largest absolute difference is 0.0029 Dice units. The mean seed-to-seed standard deviation of the mean Dice is 0.0005, smaller than the largest step difference (0.0029). With 20 test phantoms the minimum detectable paired difference of @eq:mde is about 0.0022 for the comparison of the first and the last variant. Where an interval excludes zero, the difference is a property of this phantom population and of the training budget of the study; it is small in absolute terms and is not used as evidence for or against any component on patient data.
+
+@tab ph-steps | widths=1.2,1.9,0.9,1.9,0.7 | align=lcccc | size=8.5
+Paired differences between successive variants on the phantom test set (later minus earlier). The p-value is a two-sided Wilcoxon signed-rank test with Holm correction over the comparisons of the table. Dice difference with 95% bootstrap interval; HD95 difference in voxels; last column: Cohen's $d_z$ of the Dice difference.
+| Comparison | $\Delta$ Dice mean [95% CI] | p (Holm) | $\Delta$ HD95 [95% CI] | $d_z$ |
+| --- | --- | --- | --- | --- |
+| A1 vs A0 | 0.0029 [0.0014, 0.0047] | <0.001 | -0.05 [-0.10, -0.01] | 0.73 |
+| A2 vs A1 | 0.0005 [0.0000, 0.0013] | 0.073 | -0.01 [-0.03, 0.00] | 0.30 |
+| A3 vs A2 | -0.0005 [-0.0012, -0.0001] | 0.011 | 0.01 [0.00, 0.03] | -0.42 |
+| A4 vs A3 | -0.0002 [-0.0006, 0.0001] | 0.586 | 0.00 [0.00, 0.00] | -0.20 |
+| A5 vs A4 | -0.0001 [-0.0003, -0.0000] | 0.033 | 0.00 [0.00, 0.00] | -0.45 |
+@end
+
+@subsection[ph-curves] Convergence
+
+@fig ph-curves | file={FIGDIR}/ph_curves.png | width=6.2
+Training curves of the phantom study (seed 1): (a) training loss of the generator, (b) one minus the validation Dice, both on a logarithmic axis. The dotted vertical line marks the start of the adversarial epochs.
+@end
+
+@fig:ph-curves shows that the training loss of the first run falls by a factor of 14 between the first and the last epoch and that the validation error falls from 0.44 at epoch 3 to 0.0047 at epoch 27 for A0. The final validation errors (mean over seeds) are A0: 0.0162, A1: 0.0001, A2: 0.0001, A3: 0.0005, A4: 0.0004, A5: 0.0006.
+
+@subsection[v10] Diagnostics of the discriminator
+
+@fig:ph-d shows the quantities that the training code records at every adversarial epoch for the 2 run(s) of the full model: the accuracy of the discriminator on real and generated label maps (fraction of patch-level outputs above or below 0.5), the two adversarial losses, and the weight $\lambda$ of the adversarial term, which rises linearly to 0.050 over 2 epochs.
+
+@fig ph-d | file={FIGDIR}/ph_d.png | width=6.4
+Discriminator diagnostics of the full model during the adversarial epochs: (a) accuracy on real and generated label maps, (b) discriminator loss and adversarial loss of the generator, (c) weight of the adversarial term. Line styles distinguish seeds.
+@end
+
+Averaged over the adversarial epochs, the discriminator classifies 88.1% of the real and 95.6% of the generated outputs correctly; at the last epoch the figures are 100.0% and 100.0%. The discriminator is therefore not trivially separating the two classes, which is the regime in which the adversarial gradient is informative; this is the behaviour that the label smoothing, the instance noise and the small weight of the adversarial term were designed to produce. The diagnostics are recorded for the BraTS runs in exactly the same way and are reported in Section @sec:brats-res; they should be read together with the Dice and HD95 differences, because a stable discriminator without an effect on the metrics is the expected outcome of a small adversarial weight.
+
+@subsection[ph-maps] Internal behaviour of the attention gates and of the fusion stem
+
+@fig ph-gates | file={FIGDIR}/ph_gates.png | width=6.4
+Attention coefficients $\alpha$ of the gates of variant A2 on an HGG-like test phantom (central axial slice through the tumour), upsampled to the input resolution. Gate 0 acts on the highest-resolution skip connection. The white contour is the whole-tumour ground truth.
+@end
+
+@fig:ph-gates shows the coefficients of the gates of the first available variant with attention (A2, 2 seed(s)) and @tab:ph-gates their mean inside and outside the whole tumour, over the 20 test phantoms. The gates are not inactive: the mean coefficient differs between tumour and the remaining brain at 3 of 3 levels by more than 0.02. Whether the gates increase the weight of the lesion (positive difference) or of the surrounding tissue is a property of the learned function; the table reports it without interpretation, and the same analysis is applied to the BraTS models in Section @sec:brats-res.
+
+@tab ph-gates | widths=1.0,1.5,1.7,1.5 | align=cccc | size=9
+Mean attention coefficient inside the whole tumour and in the remaining brain tissue (phantom test set).
+| Gate | Inside tumour | Outside tumour (brain) | Difference |
+| --- | --- | --- | --- |
+| 0 | 0.732 | 0.226 | +0.505 |
+| 1 | 0.761 | 0.223 | +0.538 |
+| 2 | 0.288 | 0.059 | +0.230 |
+@end
+
+@fig ph-maf | file={FIGDIR}/ph_maf.png | width=3.8
+Mean weights of the modality-attentive fusion stem (variant A3, averaged over the stem channels and over the test phantoms of each grade). The dotted line is the uniform weight 1/4.
+@end
+
+@tab:ph-maf and @fig:ph-maf give the weights that the fusion stem assigns to the four modalities (variant A3). A uniform allocation corresponds to 1/4; the largest deviation from it, in the mean over the HGG-like test phantoms, is 0.004. The weights for HGG-like and LGG-like phantoms differ by at most 0.000, and their standard deviation across phantoms is at most 0.002.
+
+@tab ph-maf | widths=1.2,1.6,1.6,1.9 | align=cccc | size=9
+Fusion weights per modality (mean over stem channels and test phantoms).
+| Modality | HGG-like | LGG-like | SD across HGG-like phantoms |
+| --- | --- | --- | --- |
+| T1 | 0.249 | 0.248 | 0.001 |
+| T1ce | 0.254 | 0.255 | 0.002 |
+| T2 | 0.249 | 0.249 | 0.001 |
+| FLAIR | 0.248 | 0.248 | 0.000 |
+@end
+
+The fusion weights are uniform to within the precision of the table: the stem does not select among the modalities, neither on average nor between phantoms, and the weights of the two grades are indistinguishable. The weights are computed from globally pooled descriptors of stems that end in an instance normalisation, which standardises every channel of every volume and thereby removes most of the volume-specific information that the pooled descriptor could carry; this is a plausible reason for the uniform weights, which the present experiment does not isolate (it would require a variant without normalisation in the stems). As a consequence the stem behaves as a fixed averaging of four modality-specific branches followed by a mixing convolution, and a benefit of this component cannot be attributed to modality selection. This design limitation is discussed in Chapter 5.
+
+@subsection[ph-grade] Grade classification pipeline
+
+The out-of-fold protocol of Section @sec:grade was run on the phantoms with the full model (A5, seed 1) trained on each of the three folds. @tab:ph-grade-tab gives the result: with the features of the predicted masks and logistic regression, the test AUC is 1.000 [1.000, 1.000] and the cross-validated AUC 1.000 [1.000, 1.000]; with the ground-truth masks the test AUC is 1.000 [1.000, 1.000]. The phantom grades differ by construction in the enhancement of the shell, so a high AUC is expected and shows that the feature extraction, the leak-free fold assignment and the classifier code work end to end; with only 20 test phantoms, of which about five are LGG-like, the intervals are wide and the number carries no information about the achievable AUC on BraTS.
+
+@tab ph-grade-tab | widths=2.0,1.35,1.35,0.6,0.6,0.6,0.6,0.5 | align=lccccccc | size=7.5
+Grade classification on the phantoms (three folds, 80 development phantoms, 20 test phantoms). Predicted masks come from the out-of-fold models of the full model (seed 1).
+| Features from | CV AUC [95% CI] | Test AUC [95% CI] | Acc | Sens | Spec | Bal. acc | ECE |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Predicted masks, logistic regression | 1.000 [1.000, 1.000] | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 1.000 | 1.000 | 0.080 |
+| Predicted masks, gradient boosting | 1.000 [1.000, 1.000] | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 1.000 | 1.000 | 0.000 |
+| Ground-truth masks, logistic regression | 1.000 [1.000, 1.000] | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 1.000 | 1.000 | 0.078 |
+| Ground-truth masks, gradient boosting | 1.000 [1.000, 1.000] | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 1.000 | 1.000 | 0.000 |
+@end

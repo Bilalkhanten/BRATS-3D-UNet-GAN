@@ -1,0 +1,95 @@
+@chapter[concl] Conclusions and Future Work
+
+@section[c-summary] Summary of the Work
+
+This thesis set out to design, derive, implement and evaluate a three-dimensional framework for brain tumour segmentation and glioma grade classification in multimodal MRI, built around a residual attention U-Net, modality-attentive fusion, a Tversky-based hybrid loss and adversarial refinement, and to do so under an evaluation protocol that is strict enough for the conclusions to be trusted. The starting point was a preliminary study whose protocol (cropped inputs, one aggregate score, a tumour-versus-no-tumour label that the data cannot support, and an internally inconsistent pair of overlap values) did not allow the contribution of its components to be assessed (Chapter 1). A review of the literature (Chapter 2) showed that the evidence for adversarial training in segmentation is mixed, that the value of attention and fusion modules is rarely isolated by controlled ablation, that evaluation practice in the field is vulnerable to leakage and to metric conventions that are not stated, and that radiomic grading studies often use features of reference segmentations, which overstates what a deployed pipeline could do.
+
+Chapter 3 formalised the problem and each component. The loss analysis derived the gradients of the soft Dice and Tversky losses, showed that their gradient mass on a lesion depends only weakly on its size, and showed that the Tversky loss with the weights $(0.3, 0.7)$ penalises a missed voxel $7/3$ times as strongly as a spurious one. The relation between Dice and IoU was derived with its Jensen bounds. The attention gate and the fusion stem were analysed through the gradient of the gated skip connection and the properties of the modality weights; the receptive field and the exact parameter and operation counts of every variant were obtained. The adversarial game was analysed through the optimal least-squares discriminator and the trivial-separation pitfall that motivates label smoothing, instance noise and a ramped weight. The chapter also specified the training schedule, the sliding-window inference, the leak-free grade protocol and the statistical analysis, including five pre-specified hypotheses and their decision rules.
+
+Chapter 4 reported the evidence. The verification experiments confirmed the derived properties by exact calculation and simulation, quantified the cost of the components, the coverage of the confidence intervals and the minimum detectable differences, and demonstrated the dependence between slices. The phantom study ran the complete pipeline on synthetic volumes with known ground truth and showed that the training, evaluation, aggregation and diagnostic code behaves as designed; because it is saturated, a hard synthetic benchmark was added on which the components, the Tversky parameters, the adversarial configuration, the random seed and the data partition could be compared with paired statistics. The BraTS section is generated from the output files of the experiments and reports, for every hypothesis, a verdict computed by the rules fixed in advance. Chapter 5 specified how each outcome is to be interpreted and discussed the threats to validity and the limitations.
+
+@@HARD_CONCL@@@section[c-rq] Achievement of the Objectives
+
+@tab rq | widths=0.85,2.25,3.4 | align=lll | size=8.5
+Status of the objectives of Section @sec:objectives at the time of writing.
+| Objective | Content | Status and basis |
+| --- | --- | --- |
+| 1 | Mathematical formalisation and derivation of the properties that justify the design | Achieved (Chapter 3), with numerical checks in Chapter 4: class-imbalance behaviour of the losses, the $\beta/\alpha$ penalty ratio, the Dice--IoU bound, attention-gate gradient attenuation, receptive field and complexity, optimal discriminator and the trivial-separation pitfall |
+| 2 | Tested, reproducible implementation verified on synthetic volumes | Achieved: 23 automated tests, numerical verification, phantom study; configuration files, fixed splits with a leakage assertion and the RUNBOOK provide reproducibility. A defect-free implementation cannot be proved, only made unlikely |
+| 3 | Leak-free protocol with the evaluation specified in advance | Achieved by construction (patient-level, grade-stratified partition with an automatic check; metrics, conventions, intervals and tests fixed in Chapter 3) |
+| 4 | Controlled ablation and comparison with nnU-Net | Executed on the hard synthetic benchmark (Section @sec:hard; H1 to H3 not supported, effects small and mixed); on BraTS decided by H1, H2, H3 and H5, with the verdicts generated in Section @sec:hyp-sum and *pending* until the BraTS runs are available; nnU-Net not run on synthetic data |
+| 5 | Grade prediction from predicted masks and loss relative to reference masks | Pipeline executed on the hard synthetic benchmark (H4 not supported; cross-validated and test AUC disagree); on BraTS decided by H4 and the ground-truth upper bound, pending until the BraTS runs are available |
+@end
+
+The thesis therefore meets the first three objectives on the basis of evidence that exists. For the remaining two it has executed the complete analysis on a synthetic benchmark, with mixed outcomes, and states where the evidence on patient data will come from and how it will be judged. This division is deliberate: it is better to report an empty cell than a number whose provenance cannot be stated.
+
+@section[c-evidence] What the Evidence Supports
+
+The thesis combines evidence of different strength, and the conclusions that may be drawn from each kind differ. @tab:c-evidence states, for each claim that the thesis makes or could be mistaken for making, the kind of evidence behind it and how far it carries.
+
+@tab c-evidence | widths=2.3,2.2,2.0 | align=lll | size=8.5
+Claims of the thesis, the evidence behind them and the strength of the conclusion.
+| Claim | Evidence | Strength |
+| --- | --- | --- |
+| The overlap losses, the Dice--IoU relation, the attention gate, the receptive field and the discriminator behave as derived | Derivation, exact calculation and Monte-Carlo simulation (Chapters 3 and 4, Appendix C) | Strong for the mathematical statements; silent on trained networks |
+| The code computes what it is specified to compute | 23 automated tests, finite-difference gradient checks, phantom study (the tests are summarised in Appendix @app:impl-app) | Strong against the specification; not a proof of absence of defects |
+| The protocol is free of patient-level leakage | Patient-level grade-stratified partition with an automatic assertion on every load | Strong by construction |
+| Components of the model differ in accuracy | Paired statistics on the hard synthetic benchmark (Section @sec:hard) | Weak: one fold, two seeds, small budget, synthetic task; effects of the order of the seed variation |
+| The Tversky weights move the operating point in the derived direction | Hard benchmark | Contradicted on the synthetic task; undecided on patients |
+| The adversarial term improves the segmentation | Hard benchmark | No measurable effect on the synthetic task; undecided on patients |
+| The model reaches a given Dice or HD95 on BraTS | None in this document | No claim is made |
+@end
+
+The table makes the central point of the thesis explicit: the strongest results are about the method and its verification, the middle ones are about what a controlled analysis can and cannot resolve, and the claim that interests a clinician, the accuracy on patients, is the one for which this document contains no number.
+
+@section[c-recs] Recommendations
+
+Five recommendations follow from the work, each tied to evidence in Chapter 4.
+
+1. *Report out-of-fold or multi-seed results.* On the hard benchmark the effect of the full model over the plain network changed with the data partition, and one of the three folds had the opposite sign (Section @sec:hd-cv); a single-fold difference of the size of the seed-to-seed variation is not a finding about the method.
+2. *Measure the operating point instead of assuming it.* The weighting of false negatives in the loss did not produce higher sensitivity in the trained network (Section @sec:hd-tv). Sensitivity, precision and the ratio of predicted to reference volume should be reported next to the Dice score whenever an asymmetric loss is used.
+3. *Monitor the discriminator.* An adversarial term whose discriminator separates the two classes almost perfectly carries little information (Section @sec:hd-gan); the accuracy of the discriminator on real and generated inputs is cheap to log and should be reported.
+4. *Inspect learned fusion weights.* Weights that are uniform for all cases (Section @sec:hd-maps) show that a fusion module does not select modalities, whatever its name suggests.
+5. *Use cross-validated estimates for small classes.* Grading from predicted masks gave a cross-validated and a test AUC that disagreed beyond their intervals on a small test set (Section @sec:hd-grade); the cross-validated estimate rests on more patients and is the more reliable.
+
+@section[c-contrib] Contributions Revisited
+
+The contributions of Section @sec:contrib are, in the form in which they are delivered, the following. (i) A mathematical treatment whose results are checked numerically rather than only asserted (for example, the share of the gradient mass on a lesion, the bound between Dice and IoU, the coverage of the intervals). (ii) A tested code base with patient-level splitting and a leakage assertion, a region-based network family with optional components, the hybrid loss, a conditional 3D PatchGAN with its diagnostics, whole-volume inference with explicit metric conventions, and the statistical analysis. (iii) A protocol that separates the evidence of different strength: verification, phantom behaviour and patient data are never mixed in a table. (iv) A reproducible path from the training runs to the BraTS tables and figures of the thesis, so that every reported number can be traced to a file written by the experiments. (v) A corrected reading of the preliminary results, with the reasons why they cannot serve as a baseline.
+
+@section[c-limits] Limitations of the Present Evidence
+
+The limitations listed in Chapter 5 are of two kinds, those of the design and those of the execution. @tab:c-limits restates the second kind in the light of the results and states what would remove each limitation.
+
+@tab c-limits | widths=2.1,2.3,2.1 | align=lll | size=8.5
+Limitations of the evidence of this thesis and the experiment that would remove them.
+| Limitation | Consequence | What would remove it |
+| --- | --- | --- |
+| No BraTS result is reported | The accuracy on patients, the central question of the segmentation problem, is open | Execution of the RUNBOOK on a GPU and regeneration of Chapter 4 |
+| The component comparison was run on one fold with two seeds | Effects of the order of the seed-to-seed difference cannot be assigned to a component | Five folds and at least three seeds for every variant |
+| The training budget was 32 epochs of 50 iterations on two CPU cores | The best validation score was reached at one of the last two evaluations for every variant, so that slower effects are structurally disfavoured | The full schedule of Chapter 3 |
+| The test set of the hard benchmark has 32 phantoms, a minority of them LGG-like | Wide intervals; unstable AUC of the grading | A larger synthetic test set, which costs only generation time |
+| The fusion stem was analysed only as built | The uniform weights may be a property of the stem, not of fusion in general | A variant that pools before the instance normalisation |
+| nnU-Net was not trained on the synthetic data | Hypothesis H5 could not be evaluated | The nnU-Net baseline of the RUNBOOK |
+@end
+
+@section[c-next] Experiments Suggested by the Findings
+
+Three experiments follow directly from the hard-benchmark findings and can be run at small cost before the BraTS runs. First, the fusion stem should be rebuilt so that the pooled descriptor is computed before the instance normalisation, and the variant should be compared with A2 and A3 under the same protocol; if the weights then differ between cases, the loss of the present stem is attributable to its construction, otherwise to the idea of the fusion. Second, the adversarial stage should be run with a discriminator whose accuracy is kept in a target range (for example by weakening the discriminator until its accuracies are far from 1, as in the run without smoothing and noise of Section @sec:hd-gan, which gave 0.44 on real and 0.68 on generated inputs), so that the question of whether the adversarial term helps can be asked of a game that is actually played. Third, the over-segmentation of the enhancing tumour, which was present for every loss, should be traced to its cause (the sampling of foreground patches, the threshold, or the blur of the labels in the hard setting) by varying one of them at a time. None of these experiments requires BraTS, and each replaces a plausible explanation by a measurement.
+
+@section[c-future] Future Work
+
+The most immediate work is the execution of the BraTS experiments with the supplied scripts and the regeneration of Chapter 4, followed by the replication of the ablation with several seeds, which would turn the single-seed intervals into statements about the method rather than about one training run. Beyond that, five directions follow from the analysis.
+
+*Calibration and uncertainty.* The region probabilities of the network are not guaranteed to be calibrated: on the hard benchmark the enhancing-tumour probabilities were over-confident in the intermediate range, and the thresholds are fixed at 0.5. Temperature scaling, deep ensembles or Monte-Carlo dropout would provide per-voxel and per-patient uncertainty and would make it possible to flag the cases on which the segmentation should not be trusted. The expected calibration error already computed for the grade classifier extends directly to the segmentation probabilities.
+
+*Learning the operating point.* The Tversky weights are fixed by hand. The derivation shows that they set the marginal cost of the two error types, but the hard benchmark showed that the trained operating point need not move in the derived direction, so that the effect has to be measured, not assumed; treating them as a clinical decision (how much over-segmentation is acceptable to avoid missing tumour tissue) and tuning them for a stated cost ratio, with the effect on sensitivity and precision reported, would connect the loss to its use.
+
+*Stronger and more varied encoders.* The discriminator, the loss and the evaluation are independent of the generator, so that transformer or hybrid encoders can be inserted into the same ablation. A comparison at equal memory and equal training budget, with several seeds, would address the question that the literature leaves open.
+
+*External validation.* The models should be evaluated on data that were not drawn from the BraTS release, with other scanners and acquisition protocols, including unprocessed images (without skull stripping and registration) and post-treatment scans. A change in the metrics under such a shift would be the most informative test of generalisation.
+
+*From grade to molecular markers.* The present grading task follows the label of the release. The 2021 classification of central nervous system tumours is based on molecular markers, and segmentation-derived features could be examined as predictors of these markers under the same leak-free protocol, with the same demand that the features come from predicted rather than reference masks.
+
+@section[c-closing] Closing Remarks
+
+A segmentation network is only as useful as the evidence that supports it. The aim of this thesis was to provide the architecture and loss components that the preliminary study proposed with the derivations, the diagnostics and the protocol that were missing, and to separate, in every table and every sentence, what has been computed from what is still to be measured. The code, the configurations, the protocol and the analysis are complete; the BraTS runs that complete the evidence can be executed with the scripts supplied, and the document regenerates itself from their output.

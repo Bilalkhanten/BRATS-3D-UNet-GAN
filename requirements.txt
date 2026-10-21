@@ -1,0 +1,13 @@
+# Tested with the versions in the comments (Python 3.13); older versions were not tested.
+torch            # 2.14.1  (CUDA build for GPU training)
+numpy            # 2.5.3
+scipy            # 1.18.1
+pandas           # 3.0.5
+scikit-learn     # 1.9.1
+nibabel          # 5.4.2   (reading BraTS NIfTI files)
+matplotlib       # 3.11.2  (figures)
+pytest           # test suite
+# thesis builder only:
+python-docx      # 1.2.0
+# external programs for the thesis builder: pandoc (LaTeX -> OMML equations), LibreOffice (page numbers), poppler-utils (pdftotext)
+# optional, for the baseline: nnunetv2

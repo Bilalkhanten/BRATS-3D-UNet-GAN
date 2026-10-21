@@ -1,0 +1,8 @@
+{
+  "name": "a3_maf",
+  "residual": true,
+  "attention": true,
+  "fusion": "maf",
+  "gan": false,
+  "w_tv": 0.0
+}

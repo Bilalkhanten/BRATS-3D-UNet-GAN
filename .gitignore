@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Data and experiment outputs (large; reproduce with the scripts)
+runs/*
+!runs/.gitkeep
+/cache/
+/splits.json
+*.pt
+*.ckpt
+*.nii
+*.nii.gz
+!data/sample/**/*.nii.gz
+/BraTS*/
+/MICCAI_BraTS*/
+
+# Thesis builder outputs
+thesis/out/
+thesis/work/
+thesis/figs_*/
+*.docx
+*.pdf
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

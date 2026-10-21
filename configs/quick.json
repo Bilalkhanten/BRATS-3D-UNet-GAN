@@ -1,0 +1,6 @@
+{
+  "epochs_seg": 100,
+  "epochs_adv": 20,
+  "iters_per_epoch": 200,
+  "val_every": 10
+}

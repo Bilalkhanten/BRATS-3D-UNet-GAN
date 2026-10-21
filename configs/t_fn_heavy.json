@@ -1,0 +1,7 @@
+{
+  "name": "t_fn_heavy",
+  "gan": false,
+  "w_tv": 1.0,
+  "tv_alpha": 0.2,
+  "tv_beta": 0.8
+}

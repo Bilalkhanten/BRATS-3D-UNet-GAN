@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bratsgan"
+version = "1.0.0"
+description = "Attention-residual 3D U-Net with adversarial refinement for BraTS segmentation and LGG/HGG grade classification"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Muhammad Bilal Khan" }]
+keywords = ["medical imaging", "segmentation", "BraTS", "3D U-Net", "GAN"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = ["torch", "numpy", "scipy", "pandas", "scikit-learn", "nibabel", "matplotlib"]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "ruff", "pre-commit", "jupyter", "nbformat"]
+thesis = ["python-docx"]
+nnunet = ["nnunetv2"]
+
+[project.scripts]
+bratsgan = "bratsgan.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["bratsgan*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["slow: end-to-end tests that train a tiny network (a few minutes on CPU)"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py310"
+extend-exclude = ["thesis", "runs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E401", "E402", "E501", "E701", "E702", "E731", "E741", "I001"]

@@ -1,0 +1,6 @@
+.git
+runs
+cache
+thesis/out
+thesis/work
+**/__pycache__

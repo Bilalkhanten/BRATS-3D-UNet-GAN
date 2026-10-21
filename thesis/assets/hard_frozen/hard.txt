@@ -1,0 +1,370 @@
+@section[hard] Hard Synthetic Benchmark
+
+@subsection[hd-design] Design of the benchmark
+
+The phantom study of the previous section shows that the pipeline works but is saturated: all variants reach almost the same Dice score, so that it cannot rank them. To obtain a task on which the components of the model can actually differ, the phantom generator was given a second setting that makes the segmentation problem harder in the ways in which BraTS is hard (@tab:hd-gen). The lesions are smaller, so that an error of a few voxels matters; the enhancing shell is thinner, which makes ET small and difficult to separate from the core; the contrast between the tumour compartments and the normal tissue is lowered and the boundaries are blurred, which reproduces the gradual transitions of infiltrating glioma; and the noise and the multiplicative bias field are stronger. @fig:hd-examples compares one phantom of each setting. The hard benchmark is a synthetic task: it contains no anatomy, no artefacts and no inter-rater variability, and it is **not** evidence about the performance on patients. Its purpose is to exercise the complete analysis (ablation, paired statistics, sensitivity, seeds, folds, grading) on a problem that is not saturated, so that the analysis produces numbers that can be read, and so that published effect sizes can be compared with the variation measured here.
+
+@tab hd-gen | widths=2.4,1.6,1.6 | align=lcc | size=9
+Settings of the phantom generator: the easy setting of the previous section and the hard setting of this section.
+| Property | Easy | Hard |
+| --- | --- | --- |
+| Number of phantoms (HGG-like / LGG-like) | 100 (75 / 25) | 160 (120 / 40) |
+| Volume size (voxels) | $48^3$ | $48^3$ |
+| Tumour semi-axes (fraction of the half-size) | $\mathcal{U}(0.18,0.34)$ | $\mathcal{U}(0.10,0.22)$ |
+| Core radius relative to the tumour (HGG-like) | 0.55 | 0.78 (thin enhancing shell) |
+| Tumour contrast | full | 0.45 towards the tissue value, then Gaussian blur ($\sigma=1.2$ voxels) |
+| Noise standard deviation | 0.03 | 0.10 |
+| Amplitude of the bias field | 0.15 | 0.30 |
+| Test phantoms / cross-validation folds | 20 / 3 | 32 / 3 (development set: 128) |
+@end
+
+@fig hd-examples | file={FIGDIR}/examples.png | width=6.0
+One HGG-like phantom of the easy setting (upper row) and of the hard setting (lower row), same slice position: T1ce, FLAIR, T2, T1 and the labels (necrotic core, enhancing shell and oedema in three colours).
+@end
+
+The experiments follow the plan of Chapter 3 in a reduced form that can be run on two CPU cores: the six cumulative variants A0 to A5 on fold 0 with two seeds (tiers A and C), two Tversky settings and four adversarial settings with one seed (tier B), and the variants A0 and A5 on the two other folds (tier D). All networks have 4 levels and 8 base channels (at most 64), are trained on $48^3$ patches with batch size 2 for 32 epochs of 50 iterations (the adversarial variants add 8 epochs of the adversarial stage; the other variants are trained for the same total number of generator updates), with AdamW at learning rate $10^{-3}$ in single precision. The discriminator has 8 base channels. Each run took 19 minutes on average. The unit of analysis is the phantom: where a variant has two seeds, the per-phantom metrics are averaged over the seeds before any statistic is computed.
+
+@subsection[hd-res] Ablation of the architecture and the objective
+
+@tab:hd-main gives the accuracy of the cumulative variants on the 32 test phantoms. Unlike the saturated easy setting, the benchmark leaves room for differences (ET reaches a Dice of only about 0.44). The mean Dice of the variants ranges from 0.720 (A3) to 0.738 (A2); the ET region is the hardest, with a mean Dice between 0.388 and 0.437 compared with 0.900 to 0.912 for WT. This ordering of the regions is the one found in the BraTS literature (@tab:pubres).
+
+@tab hd-main | widths=1.9,0.45,0.65,0.65,0.65,1.4,0.65 | align=lcccccc | size=8
+Ablation chain on the hard benchmark (fold 0, 32 test phantoms). Per-phantom metrics are averaged over the seeds (column Seeds); interval: 95% bootstrap interval of the mean over phantoms. HD95 in voxels (mean over WT, TC, ET).
+| Variant | Seeds | Dice WT | Dice TC | Dice ET | Dice mean [95% CI] | HD95 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A0 Plain 3D U-Net | 2 | 0.900 | 0.864 | 0.398 | 0.721 [0.693, 0.747] | 16.79 |
+| A1 + residual blocks | 2 | 0.912 | 0.875 | 0.399 | 0.729 [0.701, 0.756] | 16.68 |
+| A2 + attention gates | 2 | 0.909 | 0.869 | 0.437 | 0.738 [0.705, 0.770] | 16.69 |
+| A3 + MAF stem | 2 | 0.908 | 0.864 | 0.388 | 0.720 [0.695, 0.745] | 16.66 |
+| A4 + Tversky loss | 2 | 0.912 | 0.868 | 0.434 | 0.738 [0.707, 0.769] | 16.67 |
+| A5 + adversarial term (full) | 2 | 0.910 | 0.865 | 0.430 | 0.735 [0.705, 0.764] | 16.67 |
+@end
+
+@tab:hd-steps lists the paired differences between successive variants and @fig:hd-forest shows the cumulative differences with respect to A0 for each region. Some of the differences are resolved by the design. Of the 5 successive comparisons, 3 have a bootstrap interval for the mean Dice difference that excludes zero and 2 remain significant at the 5% level after the Holm correction. The last variant A5 differs from the plain network A0 by 0.014 [0.007, 0.022] in mean Dice (paired bootstrap; Wilcoxon p <0.001, $d_z$ = 0.65): the difference is positive, with an interval that excludes zero. Region by region, the difference for ET is 0.032 [0.015, 0.048], that for TC 0.001 [-0.006, 0.007] and that for WT 0.010 [0.003, 0.017].
+
+@tab hd-steps | widths=1.2,1.9,0.9,1.9,0.7 | align=lcccc | size=8.5
+Paired differences between successive variants on the hard benchmark (later minus earlier). The p-value is a two-sided Wilcoxon signed-rank test with Holm correction over the comparisons of the table; HD95 difference in voxels; last column: Cohen's $d_z$ of the Dice difference.
+| Comparison | $\Delta$ Dice mean [95% CI] | p (Holm) | $\Delta$ HD95 [95% CI] | $d_z$ |
+| --- | --- | --- | --- | --- |
+| A1 vs A0 | 0.008 [-0.001, 0.017] | 0.095 | -0.12 [-0.33, 0.02] | 0.32 |
+| A2 vs A1 | 0.009 [0.001, 0.018] | 0.095 | 0.01 [-0.01, 0.04] | 0.39 |
+| A3 vs A2 | -0.018 [-0.028, -0.008] | 0.007 | -0.02 [-0.06, 0.00] | -0.63 |
+| A4 vs A3 | 0.018 [0.009, 0.028] | 0.007 | 0.01 [-0.01, 0.03] | 0.67 |
+| A5 vs A4 | -0.003 [-0.007, 0.001] | 0.058 | 0.00 [-0.02, 0.02] | -0.30 |
+@end
+
+@fig hd-forest | file={FIGDIR}/forest.png | width=6.3
+Cumulative paired differences in Dice with respect to the plain network A0 for each region (point: mean difference, bar: 95% bootstrap interval; green: interval above zero, red: below zero, grey: contains zero).
+@end
+
+@subsection[hd-dist] Distribution of the per-phantom scores and dependence on lesion size
+
+@fig:hd-box shows the distribution of the per-phantom Dice scores and @tab:hd-dist the median and interquartile range of every variant and region, together with the number of phantoms with a mean Dice below 0.5 and with an ET Dice below 0.1 (practically missed enhancing tumours).
+
+@fig hd-box | file={FIGDIR}/box.png | width=6.4
+Distribution of the per-phantom Dice scores of the six variants on the test phantoms (box: quartiles, line: median, circles: outlying phantoms).
+@end
+
+@tab hd-dist | widths=0.55,1.45,1.45,1.45,0.75,0.75 | align=lccccc | size=8
+Median [first quartile, third quartile] of the per-phantom Dice. Last two columns: number of phantoms with mean Dice below 0.5, and with ET Dice below 0.1.
+| Variant | WT | TC | ET | Mean $<0.5$ | ET $<0.1$ |
+| --- | --- | --- | --- | --- | --- |
+| A0 | 0.912 [0.884, 0.924] | 0.875 [0.833, 0.909] | 0.524 [0.253, 0.549] | 0 | 8 |
+| A1 | 0.925 [0.895, 0.935] | 0.890 [0.874, 0.907] | 0.513 [0.231, 0.563] | 0 | 8 |
+| A2 | 0.919 [0.891, 0.937] | 0.887 [0.855, 0.911] | 0.563 [0.292, 0.631] | 0 | 8 |
+| A3 | 0.912 [0.895, 0.932] | 0.882 [0.839, 0.896] | 0.497 [0.224, 0.540] | 0 | 8 |
+| A4 | 0.921 [0.902, 0.930] | 0.875 [0.834, 0.914] | 0.546 [0.274, 0.632] | 0 | 8 |
+| A5 | 0.920 [0.900, 0.931] | 0.871 [0.834, 0.906] | 0.534 [0.280, 0.610] | 0 | 8 |
+@end
+
+@fig hd-size | file={FIGDIR}/size.png | width=6.3
+Dice of each test phantom against the volume of the reference region (logarithmic axis) for the plain network A0 (circles) and the full model A5 (squares).
+@end
+
+@tab hd-size | widths=0.9,0.5,1.1,0.8,0.8,0.8,0.8,0.9 | align=lccccccc | size=8
+Dice by size of the whole tumour (tertiles of the reference WT volume of the test phantoms). Last column: median ratio of the predicted to the reference WT volume of A5.
+| Size | n | WT volume (voxels) | WT A0 | WT A5 | ET A0 | ET A5 | Volume ratio |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| small | 11 | 189--607 | 0.877 | 0.888 | 0.433 | 0.457 | 1.07 |
+| medium | 10 | 629--803 | 0.910 | 0.918 | 0.383 | 0.431 | 0.97 |
+| large | 11 | 833--1816 | 0.913 | 0.924 | 0.376 | 0.402 | 1.00 |
+@end
+
+@fig:hd-size and @tab:hd-size show the size dependence that the evaluation chapter of the literature review anticipates. The Spearman rank correlation between the logarithm of the reference volume and the Dice score of A5 is 0.48 for WT, 0.40 for TC and 0.60 for ET: small structures are segmented less accurately; the correlation is strongest for ET. The comparison of the two networks within the tertiles shows where the differences of @tab:hd-main arise: the mean WT Dice of A5 minus that of A0 is +0.010 for the small, +0.009 for the medium and +0.012 for the large tumours, and the corresponding ET differences are +0.024, +0.048 and +0.026.
+
+@subsection[hd-curves] Convergence
+
+@fig hd-curves | file={FIGDIR}/curves.png | width=6.4
+Training curves of the six variants on the hard benchmark (fold 0, seed 1): (a) training loss of the generator (the Tversky and adversarial terms change the scale of the loss between variants), (b) validation Dice. The dotted line marks the start of the adversarial epochs.
+@end
+
+@fig:hd-curves and @tab:hd-conv show how the validation score evolves. The best validation score is reached at one of the last two evaluations in 6 of the 6 variants, which indicates that the training budget of 32 epochs is a limiting factor of this benchmark, as it is for any experiment with a budget much smaller than that of the BraTS configuration. The loss values of different variants are not comparable, because the loss of A4 and A5 contains the additional Tversky term. The selected checkpoint is the one with the highest validation Dice, so that a late degradation would be visible as a best epoch before the last one.
+
+@tab hd-conv | widths=2.0,0.8,1.0,1.0,1.0,0.9 | align=lccccc | size=8.5
+Convergence summary (seed 1, fold 0): epoch and value of the best validation Dice, validation Dice at the last epoch, final training loss and training time on two CPU cores.
+| Variant | Best epoch | Best val. Dice | Final val. Dice | Final loss | Time (min) |
+| --- | --- | --- | --- | --- | --- |
+| A0 Plain 3D U-Net | 35 | 0.707 | 0.706 | 0.328 | 17.1 |
+| A1 + residual blocks | 35 | 0.722 | 0.722 | 0.273 | 14.9 |
+| A2 + attention gates | 39 | 0.719 | 0.719 | 0.283 | 17.2 |
+| A3 + MAF stem | 39 | 0.709 | 0.709 | 0.291 | 19.3 |
+| A4 + Tversky loss | 35 | 0.727 | 0.726 | 0.510 | 19.3 |
+| A5 + adversarial term (full) | 35 | 0.726 | 0.724 | 0.522 | 19.9 |
+@end
+
+@subsection[hd-tv] Tversky parameters and the recall--precision trade-off
+
+Section @sec:losses derived that a Tversky loss with $\beta>\alpha$ weights false negatives more strongly than false positives and therefore shifts the operating point of the network towards higher sensitivity at the price of precision. The hard benchmark allows this prediction to be tested with three settings of $(\alpha,\beta)$ on top of the loss of A3, and compared with the loss without Tversky term. Adding the Tversky term with $(\alpha,\beta)=(0.3,0.7)$ to the loss of A3 changes the mean Dice by 0.018 [0.009, 0.028], the ET sensitivity by -0.038 [-0.100, 0.014] and the ET precision by 0.064 [0.041, 0.089] (paired bootstrap over phantoms). @tab:hd-tv and @fig:hd-tv give the Dice score, the precision and the sensitivity of the settings.
+
+@tab hd-tv | widths=1.1,0.8,0.8,0.9,0.9,0.9,0.9,1.0 | align=lccccccc | size=8
+Effect of the Tversky parameters $(\alpha,\beta)$ (fold 0; A3 and A4 averaged over two seeds, the two other settings one seed). Last column: median ratio of the predicted to the reference ET volume.
+| $(\alpha,\beta)$ | Dice mean | Dice ET | Prec. ET | Sens. ET | Prec. WT | Sens. WT | ET volume ratio |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| none (A3) | 0.720 | 0.388 | 0.291 | 0.701 | 0.914 | 0.909 | 2.16 |
+| (0.5, 0.5) | 0.724 | 0.396 | 0.295 | 0.718 | 0.914 | 0.916 | 2.27 |
+| (0.3, 0.7) | 0.738 | 0.434 | 0.356 | 0.663 | 0.910 | 0.921 | 1.96 |
+| (0.2, 0.8) | 0.738 | 0.450 | 0.387 | 0.589 | 0.898 | 0.920 | 1.78 |
+@end
+
+@fig hd-tv | file={FIGDIR}/tv.png | width=6.3
+Operating points (sensitivity against precision, mean over the test phantoms) of the loss settings for the three regions.
+@end
+
+When $\beta$ increases from 0.5 to 0.8 the mean ET sensitivity changes from 0.718 to 0.589 (-0.129) and the mean ET precision from 0.295 to 0.387 (+0.091). This is the opposite of the shift predicted by the derivation of Section @sec:losses: the settings with a larger weight on false negatives are more conservative, not more permissive. The prediction concerns the gradient of a single loss term at a fixed network output, whereas the trained network also depends on the region-wise Dice and cross-entropy terms, on the deep-supervision weights and on the small number of phantoms; the result is reported as measured and is not used as support for the recall argument. The median ratio of predicted to reference ET volume lies between 1.78 and 2.27 for all settings, which shows a systematic over-segmentation of the enhancing tumour that is present for every loss, including the loss without Tversky term, and is therefore not caused by $\beta$.
+
+@subsection[hd-gan] Sensitivity of the adversarial stage
+
+Hypothesis H3 of Chapter 3 asks whether the adversarial term improves the segmentation and whether the discriminator remains informative. @tab:hd-gan compares the full model with the same network trained without the adversarial term (A4, the reference of the paired differences) and with four changes of the adversarial configuration: a smaller and a larger weight, the hinge instead of the least-squares objective, and the removal of both the label smoothing and the instance noise. The last two columns give the accuracy of the discriminator on real and generated inputs, averaged over the adversarial epochs; @fig:hd-gan shows their evolution.
+
+@tab hd-gan | widths=2.0,0.8,0.8,1.8,0.8,0.8 | align=lccccc | size=8
+Sensitivity of the adversarial stage (fold 0, test phantoms; A4 and A5 averaged over two seeds, the other settings one seed). $\Delta$ Dice: mean-Dice difference to A4 with 95% bootstrap interval. Acc.: accuracy of the discriminator on real and generated inputs averaged over the adversarial epochs.
+| Setting | Dice mean | Dice ET | $\Delta$ Dice vs A4 | Acc. real | Acc. generated |
+| --- | --- | --- | --- | --- | --- |
+| no adversarial term (A4) | 0.738 | 0.434 | -- | -- | -- |
+| default $\lambda=0.05$ (A5) | 0.735 | 0.430 | -0.003 [-0.007, 0.001] | 0.92 | 0.96 |
+| $\lambda=0.01$ | 0.736 | 0.448 | -0.003 [-0.008, 0.003] | 0.92 | 0.96 |
+| $\lambda=0.2$ | 0.735 | 0.447 | -0.003 [-0.009, 0.003] | 0.92 | 0.96 |
+| hinge loss | 0.734 | 0.450 | -0.004 [-0.010, 0.002] | 0.94 | 0.98 |
+| no smoothing, no noise | 0.736 | 0.448 | -0.003 [-0.008, 0.003] | 0.44 | 0.68 |
+@end
+
+@fig hd-gan | file={FIGDIR}/gan.png | width=6.4
+Discriminator diagnostics of the adversarial settings (seed 1): (a) accuracy on real inputs, (b) accuracy on generated inputs, (c) discriminator loss, over the adversarial epochs.
+@end
+
+For the default configuration the paired difference between A5 and A4 is -0.003 [-0.007, 0.001] (Wilcoxon p 0.019); it is indistinguishable from zero (the interval contains zero). The discriminator classifies 92% of the real and 96% of the generated outputs correctly on average, so that it is close to separating the two classes almost perfectly, which means that the generator does not challenge it and that the adversarial gradient carries little information; only when the label smoothing and the instance noise are removed does the accuracy fall to the range in which the two networks compete (last row of the table). The sensitivity runs show how much of the outcome is due to the configuration: the Dice scores of the five adversarial settings lie between 0.734 and 0.736, a range of 0.001, to be compared with the seed-to-seed variability of the following subsection.
+
+@subsection[hd-seed] Variability between random seeds
+
+Because the fold, the data and the hyper-parameters are identical for the two seeds of a variant, the difference between the seeds measures the part of the observed differences that is due to the random initialisation and the random sampling of patches alone. @tab:hd-seed and @fig:hd-seed give the mean test Dice of each variant for the two seeds.
+
+@tab hd-seed | widths=1.9,0.9,0.9,0.9,0.9,1.9 | align=lccccc | size=8.5
+Mean test Dice of each variant for the two seeds (fold 0). Last column: paired difference of the per-phantom Dice (seed 2 minus seed 1) with 95% bootstrap interval.
+| Variant | Seed 1 | Seed 2 | Difference | SD | Paired difference [95% CI] |
+| --- | --- | --- | --- | --- | --- |
+| A0 Plain 3D U-Net | 0.717 | 0.724 | +0.008 | 0.005 | 0.008 [-0.010, 0.027] |
+| A1 + residual blocks | 0.730 | 0.727 | -0.003 | 0.002 | -0.003 [-0.011, 0.005] |
+| A2 + attention gates | 0.724 | 0.752 | +0.028 | 0.020 | 0.028 [0.013, 0.042] |
+| A3 + MAF stem | 0.719 | 0.721 | +0.003 | 0.002 | 0.003 [-0.010, 0.016] |
+| A4 + Tversky loss | 0.742 | 0.734 | -0.008 | 0.006 | -0.008 [-0.019, 0.003] |
+| A5 + adversarial term (full) | 0.735 | 0.734 | -0.001 | 0.001 | -0.001 [-0.010, 0.008] |
+@end
+
+@fig hd-seed | file={FIGDIR}/seed.png | width=4.4
+Mean test Dice of the variants for the two seeds (a vertical line connects the two values of a variant).
+@end
+
+The mean absolute difference between the seeds is 0.008 Dice units (largest: 0.028), and the mean standard deviation of the two values is 0.006. For comparison, the largest absolute difference between two successive variants of @tab:hd-steps is 0.018. A difference between variants that does not clearly exceed the seed-to-seed difference cannot be attributed to the component that distinguishes them, which is the reason why the protocol of Chapter 3 requires several seeds, or the fold-wise replication of the next subsection, before a component is accepted as beneficial.
+
+@subsection[hd-cv] Cross-validation over three folds
+
+The comparison of the plain network A0 with the full model A5 was repeated on the other two folds (seed 1), so that every one of the 128 development phantoms is segmented by a model that did not train on it. @tab:hd-cv gives the out-of-fold Dice per fold and @fig:hd-cv the same quantity graphically. Pooled over the folds, the mean out-of-fold Dice is 0.712 for A0 and 0.717 for A5; the paired difference is 0.004 [-0.004, 0.012] (Wilcoxon p 0.051, $d_z$ = 0.09), which is indistinguishable from zero (the interval contains zero). By region the differences are 0.006 [0.001, 0.011] for WT, -0.003 [-0.014, 0.007] for TC and 0.011 [-0.004, 0.025] for ET, and the difference of the HD95 is -0.02 [-0.13, 0.10] voxels. On the common test set, the metrics of the three fold models averaged per phantom give 0.721 for A0 and 0.726 for A5 (paired difference 0.006 [-0.003, 0.015]).
+
+@tab hd-cv | widths=0.7,0.6,1.3,1.3,2.1 | align=ccccc | size=8.5
+Out-of-fold validation Dice per fold (seed 1) and paired difference A5 $-$ A0 with 95% bootstrap interval.
+| Fold | n | A0 | A5 | A5 $-$ A0 [95% CI] |
+| --- | --- | --- | --- | --- |
+| 0 | 43 | 0.707 | 0.726 | 0.019 [0.006, 0.031] |
+| 1 | 43 | 0.709 | 0.699 | -0.010 [-0.028, 0.004] |
+| 2 | 42 | 0.720 | 0.725 | 0.005 [-0.007, 0.018] |
+@end
+
+@fig hd-cv | file={FIGDIR}/cv.png | width=4.2
+Mean out-of-fold Dice of A0 and A5 on the three folds.
+@end
+
+The spread of the mean Dice of the full model between the folds is 0.027, which is larger than the mean seed-to-seed difference of the previous subsection (0.008). The per-fold differences +0.019, -0.010, +0.005 do not have the same sign on all folds: the direction of the effect of the full model over the plain network is not stable across the data partitions, and a single-fold comparison, such as the ablation of the previous subsections, must be read with this variability in mind.
+
+@subsection[hd-grade] Grade classification from the predicted masks
+
+The leak-free grading protocol of Section @sec:grade was run on the hard benchmark with the full model (A5, seed 1) trained on each of the three folds. With features of the predicted masks and logistic regression, the cross-validated AUC is 0.573 [0.467, 0.677] and the test AUC 0.922 [0.794, 1.000] (accuracy 0.812, sensitivity 0.792, specificity 0.875, expected calibration error 0.162); gradient boosting reaches a test AUC of 0.547 [0.309, 0.776]; with the features of the ground-truth masks the test AUC is 1.000 [1.000, 1.000], which is the upper bound for the segmentation quality of this benchmark. @tab:hd-grade-tab gives all four combinations of mask source and classifier. The grades of the phantoms differ by construction in the enhancement of the shell and the size of the core, so that the task measures how much of this information survives the segmentation error; the number of LGG-like test phantoms is small, and the intervals are accordingly wide. The cross-validated and the test AUC differ by 0.35, and their intervals do not overlap. Both estimates come from the same pipeline, so that the difference is a property of the data and cannot be attributed to a change of method: the cross-validated estimate rests on 128 development phantoms, the test estimate on 32 phantoms of which only a minority are LGG-like, and the AUC of such a small minority class is volatile. The experiment does not allow the discrepancy to be resolved; the test value is therefore to be read as an optimistic and unstable estimate, and the cross-validated value as the more reliable statement that the features of the predicted masks carry little information about the grade on this benchmark although the ground-truth masks carry all of it. Neither is a statement about BraTS.
+
+@tab hd-grade-tab | widths=2.0,1.35,1.35,0.6,0.6,0.6,0.6,0.5 | align=lccccccc | size=7.5
+Grade classification on the hard benchmark (three folds, development set of 128 phantoms, test set of 32 phantoms). Predicted masks come from the out-of-fold models of the full model (seed 1).
+| Features from | CV AUC [95% CI] | Test AUC [95% CI] | Acc | Sens | Spec | Bal. acc | ECE |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Predicted masks, logistic regression | 0.573 [0.467, 0.677] | 0.922 [0.794, 1.000] | 0.812 | 0.792 | 0.875 | 0.833 | 0.162 |
+| Predicted masks, gradient boosting | 0.570 [0.453, 0.684] | 0.547 [0.309, 0.776] | 0.750 | 0.958 | 0.125 | 0.542 | 0.212 |
+| Ground-truth masks, logistic regression | 1.000 [0.998, 1.000] | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 1.000 | 1.000 | 0.147 |
+| Ground-truth masks, gradient boosting | 1.000 [1.000, 1.000] | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 1.000 | 1.000 | 0.000 |
+@end
+
+@subsection[hd-calib] Calibration of the voxel probabilities
+
+The segmentation network outputs a probability per voxel and region, and the quality of these probabilities matters when they are used beyond the thresholded mask, for example to display uncertainty. @fig:hd-calib shows reliability diagrams of the plain network and the full model on the test phantoms (all brain voxels, ten equal-width probability bins), and @tab:hd-calib the expected calibration error of each region.
+
+@fig hd-calib | file={FIGDIR}/calib.png | width=6.3
+Reliability diagrams of A0 and A5 (fold 0, seed 1) on the test phantoms: observed frequency of the region against the predicted probability, with the expected calibration error (ECE) in the legend.
+@end
+
+@tab hd-calib | widths=1.2,1.6,1.6 | align=ccc | size=9
+Voxel-wise expected calibration error (ten bins, brain voxels of the test phantoms).
+| Region | A0 | A5 |
+| --- | --- | --- |
+| WT | 0.0038 | 0.0047 |
+| TC | 0.0024 | 0.0026 |
+| ET | 0.0099 | 0.0062 |
+@end
+
+The ECE values are small (at most 0.0099) because the vast majority of the brain voxels are confidently background and dominate the bins at the extremes; the average therefore hides the behaviour in the intermediate bins, which correspond to the boundary voxels and to uncertain regions. In these bins the curves of @fig:hd-calib depart visibly from the diagonal: for the enhancing tumour both networks are over-confident, that is the observed frequency of ET stays below the predicted probability over most of the range, which agrees with the over-segmentation of ET reported in @tab:hd-tv (predicted volumes about twice the reference volume). For WT and TC the sign of the deviation differs between the two networks, so that the figure does not support the statement that either one is better calibrated; the ECE values of the two networks differ by at most 0.0037.
+
+@subsection[hd-qual] Qualitative comparison
+
+@fig:hd-qual shows three test phantoms of fold 0 (seed 1) selected by the difference between the Dice scores of A5 and A0, not by their appearance: the phantom with the largest gain of A5, the one at the median of the differences, and the one with the largest loss. The selection rule makes the figure a fair representation of the spread, and @tab:hd-qual gives the scores of the three cases.
+
+@fig hd-qual | file={FIGDIR}/qual.png | width=5.6
+Qualitative comparison on three test phantoms (central axial slice through the tumour): T1ce, FLAIR, and the predictions of A0 and A5 on T1ce. White: ground-truth contours of WT, TC and ET; dashed coloured contours: prediction (WT blue, TC yellow, ET red).
+@end
+
+@tab hd-qual | widths=1.6,0.6,0.6,0.8,0.8,0.8,0.8 | align=lccccccc | size=8.5
+Dice of the three phantoms of @fig:hd-qual.
+| Selection | Phantom | Grade | Mean Dice A0 | Mean Dice A5 | ET Dice A0 | ET Dice A5 |
+| --- | --- | --- | --- | --- | --- | --- |
+| largest gain of A5 | 094 | HGG | 0.681 | 0.789 | 0.464 | 0.632 |
+| median difference | 079 | HGG | 0.804 | 0.824 | 0.554 | 0.638 |
+| largest loss of A5 | 003 | HGG | 0.744 | 0.693 | 0.537 | 0.493 |
+@end
+
+@subsection[hd-gal] Gallery of samples and detections
+
+The qualitative comparison of the previous subsection shows three phantoms selected by the difference between two networks. This subsection shows further samples selected by rules that are fixed before the images are drawn, so that the gallery covers the range of the detections and not only their successes. The test set of fold 0 has 32 phantoms (24 HGG-like and 8 LGG-like), and each of the seven figures shows two phantoms that appear in no other figure, 14 in total. The selections are: the HGG-like phantoms with the highest Dice of A5 (@fig:hd-g1), those at the median (@fig:hd-g2), LGG-like phantoms (@fig:hd-g3), the smallest lesions (@fig:hd-g4), the lowest Dice (@fig:hd-g5), two phantoms drawn at random with a fixed seed and detected by four different networks (@fig:hd-g6), and the largest lesions in three orthogonal views (@fig:hd-g7). @tab:hd-gal gives the reference volumes and the Dice scores of the 14 phantoms.
+
+@fig hd-g1 | file={FIGDIR}/gal_g1.png | width=6.4
+The two HGG-like test phantoms with the highest mean Dice of A5. Columns: T1ce, FLAIR, reference labels, detection of A5, and error map. Central axial slice through the tumour. Label colours: blue, necrotic or non-enhancing core; green, oedema; yellow, enhancing tumour. Error map: green, correct label; amber, tumour voxel with the wrong label; red, false positive; blue, missed tumour voxel.
+@end
+
+@fig hd-g2 | file={FIGDIR}/gal_g2.png | width=6.4
+The two HGG-like test phantoms whose mean Dice of A5 is closest to the median over the HGG-like test phantoms. Columns as in the preceding figure.
+@end
+
+@fig hd-g3 | file={FIGDIR}/gal_g3.png | width=6.4
+LGG-like test phantoms (non-enhancing core, rarely a small enhancing focus). Columns as in the preceding figures; a coloured pixel in the detection that has no counterpart in the reference marks a false alarm. Label colours: blue, necrotic or non-enhancing core; green, oedema; yellow, enhancing tumour. Error map: green, correct label; amber, tumour voxel with the wrong label; red, false positive; blue, missed tumour voxel.
+@end
+
+@fig hd-g4 | file={FIGDIR}/gal_g4.png | width=6.4
+The two test phantoms with the smallest whole-tumour volume (that are not shown in the preceding figures). Columns as before.
+@end
+
+@fig hd-g5 | file={FIGDIR}/gal_g5.png | width=6.4
+The two test phantoms with the lowest mean Dice of A5 (failure cases). Columns as before.
+@end
+
+@fig hd-g6 | file={FIGDIR}/gal_g6.png | width=6.4
+Detections of four networks on the same two test phantoms: the plain network A0, the network with the fusion stem A3, the network trained with the Tversky weights $(0.2,0.8)$ (T0.8) and the full model A5.
+@end
+
+@fig hd-g7 | file={FIGDIR}/gal_g7.png | width=6.4
+Orthogonal views (axial, coronal, sagittal) through the centre of the whole tumour of the two test phantoms with the largest whole-tumour volume, with the reference and the detection of A5 side by side.
+@end
+
+@tab hd-gal | widths=0.5,0.7,0.6,1.1,1.0,0.8,0.8,0.8 | align=cccrrccc | size=8.5
+Samples of the gallery: figure number of the gallery (the order of @fig:hd-g1 to @fig:hd-g7), phantom, grade, volumes of the whole tumour and of the enhancing tumour in voxels, and Dice of A5 (fold 0, seed 1) for the three regions.
+| Fig. | Phantom | Grade | WT volume | ET volume | Dice WT | Dice TC | Dice ET |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 093 | HGG | 936 | 187 | 0.926 | 0.927 | 0.808 |
+| 1 | 106 | HGG | 723 | 161 | 0.936 | 0.932 | 0.754 |
+| 2 | 094 | HGG | 542 | 96 | 0.909 | 0.826 | 0.632 |
+| 2 | 025 | HGG | 906 | 120 | 0.916 | 0.794 | 0.626 |
+| 3 | 144 | LGG | 836 | 13 | 0.935 | 0.897 | 0.000 |
+| 3 | 150 | LGG | 582 | 0 | 0.895 | 0.935 | 0.000 |
+| 4 | 151 | LGG | 189 | 3 | 0.831 | 0.822 | 0.060 |
+| 4 | 089 | HGG | 290 | 71 | 0.807 | 0.820 | 0.567 |
+| 5 | 128 | LGG | 756 | 0 | 0.897 | 0.881 | 0.000 |
+| 5 | 156 | LGG | 833 | 10 | 0.936 | 0.864 | 0.000 |
+| 6 | 019 | HGG | 833 | 168 | 0.899 | 0.910 | 0.732 |
+| 6 | 085 | HGG | 649 | 165 | 0.868 | 0.852 | 0.520 |
+| 7 | 070 | HGG | 1,816 | 238 | 0.887 | 0.782 | 0.506 |
+| 7 | 001 | HGG | 1,557 | 254 | 0.919 | 0.879 | 0.620 |
+@end
+
+Three features of the gallery deserve comment. First, the boundary of the whole tumour follows the reference closely in the figures, and the errors concentrate on the interface between the compartments and on the enhancing tumour, which is thin and low in contrast in the hard setting. Second, the failure cases of @fig:hd-g5 have the lowest Dice scores of the test set (0.592, 0.600) and are distinguished by the size of the reference regions (756, 833 voxels of whole tumour, against a median of 708) and not by an artefact of the benchmark. Third, the compartment that the networks disagree on is the enhancing tumour. On the two phantoms of @fig:hd-g6 the numbers of voxels labelled as enhancing are: phantom 019: reference 168, A0 336, A3 359, T0.8 241, A5 242; phantom 085: reference 165, A0 281, A3 281, T0.8 194, A5 193. A network that labels a multiple of the reference volume as enhancing, as the images of A0 and A3 show for these phantoms, makes the enhancing label cover the core and the shell together; this is the over-segmentation of the enhancing tumour that the volume ratios of @tab:hd-tv quantify over the whole test set. For the LGG-like phantoms of @fig:hd-g3 the reference contains 13, 0 enhancing voxels, and A5 labels 199, 197 voxels as enhancing; a detection of enhancement in a phantom whose reference has little or none is a false alarm of the kind that the empty-mask conventions of Chapter 3 are designed to penalise. The images are a selection and are not a statistical statement; the statistics are in the preceding subsections.
+
+@subsection[hd-maps] Internal behaviour of the attention gates and of the fusion stem
+
+@fig hd-gates | file={FIGDIR}/ph_gates.png | width=6.4
+Attention coefficients $\alpha$ of the gates of variant A2 on an HGG-like test phantom of the hard benchmark (central axial slice through the tumour), upsampled to the input resolution. Gate 0 acts on the highest-resolution skip connection. The white contour is the whole-tumour ground truth.
+@end
+
+@fig:hd-gates shows the coefficients of the gates of the first available variant with attention (A2, 2 seed(s)) and @tab:hd-gates their mean inside and outside the whole tumour, over the 32 test phantoms of the hard benchmark. The gates are not inactive: the mean coefficient differs between tumour and the remaining brain at 3 of 3 levels by more than 0.02. Whether the gates increase the weight of the lesion (positive difference) or of the surrounding tissue is a property of the learned function; the table reports it without interpretation, and the same analysis is applied to the BraTS models in Section @sec:brats-res.
+
+@tab hd-gates | widths=1.0,1.5,1.7,1.5 | align=cccc | size=9
+Mean attention coefficient inside the whole tumour and in the remaining brain tissue (test set of the hard benchmark).
+| Gate | Inside tumour | Outside tumour (brain) | Difference |
+| --- | --- | --- | --- |
+| 0 | 0.440 | 0.246 | +0.194 |
+| 1 | 0.818 | 0.197 | +0.621 |
+| 2 | 0.642 | 0.142 | +0.500 |
+@end
+
+@fig hd-maf | file={FIGDIR}/ph_maf.png | width=3.8
+Mean weights of the modality-attentive fusion stem (variant A3, averaged over the stem channels and over the test phantoms of the hard benchmark of each grade). The dotted line is the uniform weight 1/4.
+@end
+
+@tab:hd-maf and @fig:hd-maf give the weights that the fusion stem assigns to the four modalities (variant A3). A uniform allocation corresponds to 1/4; the largest deviation from it, in the mean over the HGG-like test phantoms of the hard benchmark, is 0.000. The weights for HGG-like and LGG-like phantoms differ by at most 0.000, and their standard deviation across phantoms is at most 0.002.
+
+@tab hd-maf | widths=1.2,1.6,1.6,1.9 | align=cccc | size=9
+Fusion weights per modality (mean over stem channels and test phantoms of the hard benchmark).
+| Modality | HGG-like | LGG-like | SD across HGG-like phantoms |
+| --- | --- | --- | --- |
+| T1 | 0.250 | 0.250 | 0.001 |
+| T1ce | 0.250 | 0.250 | 0.000 |
+| T2 | 0.250 | 0.250 | 0.000 |
+| FLAIR | 0.250 | 0.250 | 0.002 |
+@end
+
+The fusion weights are uniform to within the precision of the table: the stem does not select among the modalities, neither on average nor between phantoms, and the weights of the two grades are indistinguishable. The weights are computed from globally pooled descriptors of stems that end in an instance normalisation, which standardises every channel of every volume and thereby removes most of the volume-specific information that the pooled descriptor could carry; this is a plausible reason for the uniform weights, which the present experiment does not isolate (it would require a variant without normalisation in the stems). As a consequence the stem behaves as a fixed averaging of four modality-specific branches followed by a mixing convolution, and a benefit of this component cannot be attributed to modality selection. This design limitation is discussed in Chapter 5.
+
+@subsection[hd-cx] Accuracy against cost
+
+@tab:hd-cx and @fig:hd-eff relate the accuracy of the variants to their cost in the configuration of this benchmark (the parameter counts are exact, from the instantiated models; the discriminator of the adversarial stage has 179,833 further parameters and is not used at inference). The ranking by accuracy does not follow the ranking by parameters: the residual blocks, the attention gates and the fusion stem add parameters, the Tversky and adversarial terms add none to the generator.
+
+@tab hd-cx | widths=2.1,1.2,1.1,1.2,1.2 | align=lcccc | size=8.5
+Cost and accuracy of the variants on the hard benchmark (small configuration). Time: training time on two CPU cores; inference: mean time per phantom.
+| Variant | Parameters | Dice mean | Training (min) | Inference (s) |
+| --- | --- | --- | --- | --- |
+| A0 Plain 3D U-Net | 351,625 | 0.721 | 16.0 | 0.22 |
+| A1 + residual blocks | 357,385 | 0.729 | 16.3 | 0.20 |
+| A2 + attention gates | 358,788 | 0.738 | 18.3 | 0.24 |
+| A3 + MAF stem | 360,266 | 0.720 | 21.1 | 0.27 |
+| A4 + Tversky loss | 360,266 | 0.738 | 20.3 | 0.28 |
+| A5 + adversarial term (full) | 360,266 | 0.735 | 20.4 | 0.29 |
+@end
+
+@fig hd-eff | file={FIGDIR}/eff.png | width=4.4
+Mean test Dice against the number of generator parameters for the six variants.
+@end
+
+@subsection[hd-hyp] Summary of the hypotheses on the hard benchmark
+
+The decision rules of @tab:hyp were applied to the hard benchmark with the same code that will be applied to BraTS. @tab:hd-hyp gives the verdicts. H5 cannot be evaluated because the nnU-Net baseline was not trained on the synthetic data. 0 of the 4 evaluable hypotheses are supported by the strict decision rules. This is a finding about the benchmark and the small training budget, and the rules are not relaxed after the fact: the individual effects (a gain from the Tversky term, a loss from the fusion stem, a neutral adversarial term) are reported with their intervals in the preceding subsections and discussed in Chapter 5. The verdicts are conditional on the benchmark, on the small training budget and on one fold for H1 to H3; they are not verdicts on BraTS.
+
+@tab hd-hyp | widths=0.5,2.2,2.7,1.1 | align=lllc | size=8.5
+Verdicts on the pre-specified hypotheses on the hard synthetic benchmark (not on BraTS). Evidence: quantity on which the rule of @tab:hyp is applied.
+| | Hypothesis | Evidence | Verdict |
+| --- | --- | --- | --- |
+| H1 | Each ablation step raises Dice mean | 1 of 4 steps with interval above zero and Holm p < 0.05 | Not supported |
+| H2 | Asymmetric Tversky raises TC / ET sensitivity at lower precision | A4 $-$ symmetric: sensitivity ET -0.055 [-0.112, -0.005], precision ET +0.060 | Not supported |
+| H3 | Adversarial term lowers HD95 in WT or TC | A5 $-$ A4 HD95: WT -0.01, TC +0.01, ET -0.00 voxels | Not supported |
+| H4 | Grade AUC with lower 95% limit above 0.80 | test AUC 0.922 [0.794, 1.000] (threshold 0.80 for the lower limit) | Not supported |
+| H5 | Non-inferiority to nnU-Net (margin 0.01) | nnU-Net was not trained for the synthetic benchmark | Not evaluated |
+@end

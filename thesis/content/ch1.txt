@@ -1,0 +1,121 @@
+@chapter[intro] Introduction
+
+@section[overview] Overview
+
+Gliomas are the most common primary malignant tumours of the adult brain and arise from glial cells [@who2016; @who2021]. They are heterogeneous in every respect that matters for clinical decision-making: their cellular composition varies from the diffuse, slowly growing lesions classified as low-grade to the rapidly proliferating, necrotic and highly vascularised glioblastoma, whose prognosis remains poor even after maximal surgical resection followed by chemoradiotherapy [@stupp]. Magnetic resonance imaging (MRI) is the principal non-invasive tool for diagnosing, planning treatment for and monitoring these tumours, because its soft-tissue contrast and its multiple complementary sequences allow the different tissue compartments of a glioma to be visualised in a single examination [@brats17].
+
+A quantitative description of a glioma starts with *segmentation*: the assignment of every voxel of the three-dimensional examination to the whole tumour, to its enhancing portion, to its necrotic core or to the surrounding oedema. Segmentation underlies volumetric response assessment, radiotherapy target definition, surgical planning, and the extraction of quantitative imaging features (radiomics) that may carry diagnostic and prognostic information [@gillies; @aerts; @rano]. Manual delineation of a single case by an expert neuroradiologist takes a considerable amount of time and, as the multi-rater annotations collected for the Multimodal Brain Tumor Image Segmentation Benchmark (BRATS) show, is far from perfectly reproducible, particularly for the intra-tumoural compartments whose borders are gradual rather than sharp. These two limitations, cost and variability, have motivated more than a decade of research into automatic methods.
+
+Convolutional neural networks have become the dominant approach. Since the introduction of fully convolutional networks and of the U-Net [@fcn; @unet], volumetric encoder--decoder architectures [@unet3d; @vnet] have won, or been placed at the top of, successive editions of the BraTS challenge. The most instructive lesson of these editions is, however, not architectural. The 2018 and 2020 challenge entries of Isensee *et al.* argue that a carefully configured, otherwise conventional 3D U-Net is hard to beat, and that decisions about training, loss, augmentation, post-processing and, above all, *evaluation* determine the outcome at least as much as the network topology [@nonew; @nnunet_brats20]. This observation frames the present thesis. A proposed architecture, however well motivated, is a scientific claim only if the experiment that supports it is designed so that the claim can fail.
+
+@section[motivation] Motivation
+
+Three developments motivate the work reported here.
+
+*First*, volumetric segmentation networks have grown more varied: residual and densely connected blocks, attention gates, squeeze-and-excitation recalibration and, more recently, vision transformers have all been grafted on to the U-Net skeleton [@resnet; @se; @unetr; @transbts]. Each addition is accompanied by a plausible mechanism and, in the original publication, by an improvement. Whether those improvements survive a change of data split, a change of random seed and a comparison against a well-tuned baseline is much less often established [@mh_rankings].
+
+*Second*, adversarial training has repeatedly been proposed as a means to make segmentation masks anatomically coherent. A discriminator that sees an image together with a mask can penalise implausible shapes, fragmented components or boundary artefacts that voxel-wise losses cannot express [@luc; @gan_seg_liver; @moeskops]. The evidence for this idea is mixed: the reported gains are frequently small, they are measured on different data and with different baselines, and the training of the adversarial pair is notoriously delicate [@salimans; @mescheder]. A rigorous, controlled study of when an adversarial term helps a modern 3D segmentation network, and when it does not, is therefore of scientific interest independent of the outcome.
+
+*Third*, the usefulness of a segmentation network in practice depends on downstream tasks. Tumour grade, in particular the distinction between low-grade (LGG) and high-grade (HGG) glioma, can be approximated from features derived from the segmented compartments: the volume of the enhancing tumour, the ratio of necrosis to enhancing tissue, the shape of the lesion and the intensity contrast between the T1-weighted images before and after contrast administration [@cho; @decuyper; @pyradiomics]. How much of the information in the reference segmentation survives when the classifier sees only a *predicted* segmentation is rarely quantified with a protocol that prevents the segmentation network from having seen the patients on which the classifier is evaluated.
+
+@section[bg] Imaging and Annotation Background
+
+@subsection[bg-mri] Multimodal MRI of gliomas
+
+The BraTS data comprise, for every patient, four co-registered MRI volumes: native T1-weighted (T1), post-contrast T1-weighted (T1ce), T2-weighted (T2) and fluid-attenuated inversion recovery (FLAIR) [@brats15]. They are complementary. The gadolinium-based contrast agent accumulates where the blood--brain barrier is disrupted, so that the *enhancing tumour* is hyperintense on T1ce relative to T1. The *necrotic and non-enhancing tumour core* is hypointense on T1ce, and the peritumoural *oedema* with infiltrating tumour is hyperintense on T2 and FLAIR; FLAIR suppresses the signal of free cerebrospinal fluid and therefore separates the oedema from the ventricles. No single sequence delineates all compartments, which is the physical reason why multimodal fusion is central to the problem.
+
+@subsection[bg-labels] Labels, regions and the evaluation hierarchy
+
+Expert annotation in BraTS assigns each voxel one of four labels: background (0), necrotic and non-enhancing tumour core (NCR/NET, label 1), peritumoural oedema (ED, label 2) and enhancing tumour (ET, label 4). The challenge, and therefore this thesis, evaluates three *nested regions* that are unions of these labels: the whole tumour WT = {1, 2, 4}, the tumour core TC = {1, 4} and the enhancing tumour ET = {4}, so that ET ⊂ TC ⊂ WT. @fig:regions shows the relation between labels and regions. The regions overlap by construction, which has a methodological consequence exploited later: the network is trained to predict the three regions directly with independent sigmoid outputs rather than the four mutually exclusive labels with a softmax.
+
+@fig regions | file=figs/d_regions.png | width=5.6
+Relation between the annotated BraTS labels (NCR/NET, ED, ET) and the three evaluation regions whole tumour (WT), tumour core (TC) and enhancing tumour (ET), which are nested unions of the labels.
+@end
+
+@subsection[bg-data] The BraTS 2020 data
+
+The experiments of this thesis are specified on the training release of BraTS 2020, which contains 369 cases (293 HGG and 76 LGG) with expert segmentations. The organisers provide the images after co-registration to a common anatomical template, resampling to an isotropic 1 mm resolution and skull-stripping, so that every volume has the size 240 × 240 × 155 voxels. Annotations were produced by one to four raters following one protocol and were approved by experienced neuroradiologists. The challenge reports the Dice similarity coefficient and the 95th-percentile Hausdorff distance (HD95) separately for WT, TC and ET [@brats18]. As a reference point for later chapters, the nnU-Net-based entry of Isensee *et al.* to the 2020 challenge, an ensemble of self-configured networks, obtained mean Dice scores of 0.8203 (ET), 0.8895 (WT) and 0.8506 (TC) and HD95 values of 17.805, 8.498 and 17.337 mm on the hidden test set of the challenge, as reported by its authors.
+
+@note | title=Interpretation of published reference numbers
+The challenge test set is hidden and is not available to this thesis; the numbers above were obtained under the organisers' protocol with a different, larger training set and an ensemble of models. They are quoted only to indicate the *scale* of values that a well-configured 3D U-Net pipeline attains on this problem. They are not a target that the experiments of Chapter 4 must reach and they cannot be compared directly with results on a locally held-out subset of the training release.
+@end
+
+@section[problem] Problem Statement
+
+Let a case be an ordered tuple of four volumes $\mathbf{X} = (X_{\mathrm{T1}}, X_{\mathrm{T1ce}}, X_{\mathrm{T2}}, X_{\mathrm{FLAIR}})$ defined on a common voxel grid $\Omega \subset \mathbb{Z}^3$, with a reference label volume $L: \Omega \to \{0,1,2,4\}$ and a patient-level grade $c \in \{\mathrm{LGG}, \mathrm{HGG}\}$. The thesis addresses two coupled learning problems.
+
+- **Segmentation.** Learn a function $f_\theta$ that maps $\mathbf{X}$ to three probability volumes $\hat{P} = (\hat{P}_{\mathrm{WT}}, \hat{P}_{\mathrm{TC}}, \hat{P}_{\mathrm{ET}})$, such that the thresholded regions maximise the expected Dice score and minimise the expected HD95 with respect to the regions derived from $L$ on *unseen patients*.
+- **Classification.** Given only the *predicted* regions and the images, learn a function $g_\phi$ that estimates $\Pr(c = \mathrm{HGG} \mid \mathbf{X}, \hat{P})$ and is evaluated on patients that neither $f_\theta$ nor $g_\phi$ has seen.
+
+Both problems are subject to three structural difficulties. The foreground is a small fraction of the volume, so that the positive class is heavily outnumbered and voxel-wise cross-entropy is dominated by the background. The sub-regions have strongly different sizes and contrasts, so that the hardest region (ET) is also the smallest. Finally, the cases are few: with 369 patients, the sampling variability of any aggregate metric is large, and the way in which patients are partitioned into training and evaluation sets decides whether the reported number is an estimate of generalisation or of memorisation.
+
+@section[prelim] Relation to the Preliminary Study
+
+This thesis builds on a preliminary study that proposed a 3D U-Net with residual blocks and attention gates, combined with a generative adversarial refinement module and a hybrid Dice, Tversky and adversarial loss, for the segmentation and classification of tumours in multimodal imaging (submitted manuscript, [@prelim]). That study demonstrated the feasibility of the architecture. The present work keeps the architectural idea and re-specifies the *experimental protocol* so that its claims become testable. The changes are summarised in @tab:delta and are discussed where they are implemented (Chapter 3).
+
+@tab delta | widths=1.5,2.3,2.7 | align=lll | size=9
+Differences between the preliminary study and the protocol of this thesis.
+| Aspect | Preliminary study | This thesis |
+| --- | --- | --- |
+| Evaluation unit | One aggregate overlap score | Three nested regions (WT, TC, ET), each with Dice and HD95, reported per patient |
+| Input at test time | Volumes cropped around the tumour | Whole brain; the network must localise the tumour itself (sliding window) |
+| Data partitioning | Hold-out proportions stated for cases, with a 10-fold scheme also mentioned | Patient-level, grade-stratified: one fixed test set plus five cross-validation folds; leakage is asserted in code |
+| Classification target | Tumour versus no tumour | LGG versus HGG, from predicted masks only; out-of-fold features |
+| Hyper-parameters | Reported values differ between text and table | One configuration file per experiment, stored with the results |
+| Evidence for components | Comparison with generic CNN/RNN/SVM methods | Controlled ablation of each component, nnU-Net baseline, paired statistics with confidence intervals |
+| Uncertainty | Mean $\pm$ standard deviation | Bootstrap confidence intervals, effect sizes, multiplicity correction |
+@end
+
+The motivation for each change is methodological. A tumour-centred crop presupposes that the tumour has already been found, and it removes most of the background voxels that can generate false positives, which makes overlap scores easier to attain than in a whole-brain setting. Because every case in the BraTS release contains a tumour, a "tumour versus no tumour" label cannot be learned or evaluated from these data; the grade label that the release does provide is clinically meaningful and testable. A single mean Dice value hides the fact that the sub-regions are of very different difficulty. The discussion in Chapter 5 returns to what these changes imply for the interpretation of numbers reported in the preliminary study.
+
+@section[objectives] Research Objectives and Hypotheses
+
+The overall aim is to design, derive, implement and *rigorously evaluate* a 3D segmentation-and-grading framework that combines a residual attention U-Net, modality-attentive fusion, a Tversky-based loss and adversarial refinement. Five objectives follow.
+
+1. To formalise the segmentation problem and each architectural and loss component mathematically, and to derive the properties (gradient behaviour under class imbalance, relation between Dice and IoU, receptive-field growth, model complexity) that justify the design choices.
+2. To implement the framework as a tested, reproducible code base whose correctness is verified against analytical expectations and on synthetic volumes with known ground truth.
+3. To define a leak-free training, validation and test protocol with patient-level partitioning, and to specify the evaluation (metrics, conventions for empty regions, confidence intervals, tests) before any result is seen.
+4. To quantify, by a controlled ablation, the contribution of each component and of the adversarial term, and to compare the full model with a self-configuring nnU-Net baseline.
+5. To assess LGG/HGG grade prediction from predicted segmentations and the loss of information relative to reference segmentations.
+
+Objectives 1 to 3 are met by the derivations, the implementation and the protocol themselves; objectives 4 and 5 are operationalised as the five hypotheses of @tab:hyp. The hypotheses, together with their decision rules, are fixed here, before the BraTS experiments are executed, so that Chapter 5 can state for each of them whether the data support it, contradict it or are inconclusive.
+
+@tab hyp | widths=0.45,3.35,2.7 | align=cll | size=9
+Pre-specified hypotheses and decision rules (all on held-out patients; $\mathrm{Dice}_{\mathrm{mean}}$ is the mean over WT, TC and ET; all intervals are 95% bootstrap intervals).
+| ID | Hypothesis | Decision rule |
+| --- | --- | --- |
+| H1 | Each component of the ablation chain (residual blocks, attention gates, modality-attentive fusion, Tversky loss) increases $\mathrm{Dice}_{\mathrm{mean}}$ relative to its predecessor | Paired difference interval excludes zero (Holm-corrected Wilcoxon test, family of the four comparisons) |
+| H2 | The asymmetric Tversky loss ($\alpha=0.3$, $\beta=0.7$) increases sensitivity of TC and ET relative to the Dice-equivalent setting $\alpha=\beta=0.5$, at a cost in precision | Interval of the sensitivity difference excludes zero and the precision difference is non-positive |
+| H3 | Adversarial refinement improves boundary quality (lower HD95) more than overlap (Dice) | HD95 difference interval (GAN minus no GAN) excludes zero in WT or TC; Dice change reported with its interval |
+| H4 | Grade classification from predicted masks (primary classifier: regularised logistic regression) reaches an AUC with lower confidence limit above 0.80 | Lower 95% limit of the test AUC exceeds 0.80 |
+| H5 | The full model is non-inferior to the nnU-Net baseline | Upper limit of the interval of (baseline minus full) $\mathrm{Dice}_{\mathrm{mean}}$ is below the margin $\delta = 0.01$ |
+@end
+
+Hypotheses H1 to H5 are stated so that they can be refuted; the thesis reports whichever outcome the data produce. In particular, H5 is a demanding hypothesis because the baseline is a strong, widely used reference.
+
+@section[contrib] Contributions
+
+The contributions of this thesis are:
+
+- **A mathematical treatment of the framework.** Derivations of the gradient of the soft Dice and Tversky losses and of their behaviour under class imbalance, of the Dice--IoU feasibility region, of the optimal discriminator of the least-squares GAN and of the effective generator objective, of the additive attention gate and of the modality-attentive fusion stem, of the receptive field and the exact parameter and multiply-accumulate counts (Chapter 3).
+- **A complete, tested implementation.** A PyTorch code base with patient-level splitting and an automatic leakage check, a region-based network family, the hybrid loss, a conditional 3D PatchGAN, Gaussian-weighted sliding-window inference, BraTS-convention metrics, an out-of-fold grade classifier and a statistical toolbox, verified by an automated test suite (Chapter 3 and Appendix A).
+- **A pre-specified experimental protocol.** Five hypotheses with decision rules, a tiered experimental plan, and statistical analysis that quantifies uncertainty rather than reporting point estimates (Chapters 1 and 3).
+- **Verification evidence.** Analytical and numerical verification of the theory, a saturated phantom study that shows the pipeline works, and a hard synthetic benchmark with 160 volumes and exactly known ground truth on which the ablation chain, the Tversky and adversarial sensitivity analyses, two seeds, three folds, calibration and the grading pipeline are evaluated with paired statistics, clearly separated from evidence about real patients (Chapter 4).
+- **A reproducible path to the BraTS results.** Scripts, configurations and a thesis builder that populates the BraTS tables and figures directly from the output files of the training runs, so that no number in the results chapters is typed by hand (Appendix B).
+
+@fig overview | file=figs/d_pipeline.png | width=6.1
+Overview of the proposed framework: patch-based training with a foreground-biased sampler, supervised pre-training followed by adversarial refinement, and whole-volume inference followed by evaluation and grade classification.
+@end
+
+@section[status] Scope and Evidentiary Status of the Reported Results
+
+The thesis distinguishes four kinds of evidence, and every table and figure in Chapter 4 is labelled with its kind.
+
+1. **Analytical results**, obtained by derivation or by exact computation (for example, parameter counts and gradient masses). They hold irrespective of data.
+2. **Verification experiments on synthetic phantoms.** Procedurally generated four-channel volumes with BraTS-style labels, used to test that the code behaves as the theory predicts and that the experimental pipeline is free of defects. Phantoms are far easier than real MRI, and *no conclusion about clinical performance, or about the ranking of methods on real patients, is drawn from them.*
+3. **A hard synthetic benchmark**, in which the phantom generator is set to produce small lesions, thin enhancing shells, low tumour contrast, blurred boundaries and strong noise, so that the variants of the model are not saturated and the complete analysis (ablation, sensitivity, seeds, folds, grading, calibration) can be run with real numbers. Like the phantoms, it is *not* evidence about patients; it shows that the analysis machinery works on a task where differences exist and gives the effect sizes against which published gains can be put in perspective.
+4. **BraTS experiments**, executed under the protocol of Chapter 3. Where the corresponding runs have not been completed when the document is generated, the table cells are marked *pending* instead of being filled with estimates.
+
+@section[organisation] Organisation of the Thesis
+
+Chapter 2 reviews the clinical background, the BraTS benchmark, deep segmentation architectures, attention and fusion mechanisms, loss functions, adversarial learning, evaluation metrics and statistical practice, and radiomic grading, and it identifies the gaps that the thesis addresses. Chapter 3 presents the methodology: the formal problem definition, data handling, the mathematical model of each component, the training and inference procedures, the grade classifier, the evaluation protocol and the statistical analysis. Chapter 4 reports the verification experiments, the synthetic studies and the status of the BraTS results. Chapter 5 discusses the findings in the light of the pre-specified hypotheses and states the threats to validity. Chapter 6 concludes and outlines future work. The appendices contain implementation details, the experiment plan, additional derivations and supplementary tables.

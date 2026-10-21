@@ -1,0 +1,383 @@
+@chapter[meth] Methodology
+
+@section[m-overview] Overview and Design Principles
+
+This chapter specifies the proposed framework, the procedures used to train and evaluate it, and the mathematics that justifies each design decision. The implementation that accompanies the thesis realises exactly the objects defined here; the correspondence between sections and code modules is given in Section @sec:impl. The design follows four principles that arise from the gaps identified in Chapter 2.
+
+1. **The evaluation target determines the training target.** The network predicts the nested evaluation regions WT, TC and ET with independent sigmoid outputs, and the loss is built from overlap terms that approximate the evaluation metric.
+2. **Every claim is a controlled comparison.** All variants of the ablation share the data, the optimiser, the augmentation, the number of generator updates and the inference procedure; they differ in exactly one component.
+3. **Information flows in one direction only.** Normalisation constants are estimated per case; the partition of patients into training, validation and test sets is fixed before any model is trained and is verified programmatically; the downstream grade classifier sees only out-of-fold predictions.
+4. **Uncertainty is part of the result.** Every aggregate is accompanied by a bootstrap confidence interval, and every comparison by a paired difference with an effect size.
+
+@fig protocol | file=figs/d_protocol.png | width=6.0
+Data partitioning protocol: a grade-stratified held-out test set and five cross-validation folds are drawn at the patient level; for each fold, four folds train the network and one is used for model selection; out-of-fold predictions feed the grade classifier.
+@end
+
+@algo pipeline
+The complete procedure from raw volumes to the reported results (the details of every step are given in the algorithms of this chapter).
+Input: BraTS cases (four sequences, labels, grade), configuration of a variant
+split cases at patient level into test set and K folds (grade-stratified, seed 42);  assert that the parts are disjoint
+for each fold k:
+    preprocess all cases (Algorithm prep);  training patients = other folds,  validation patients = fold k
+    train G_k in the supervised stage, then (variants with GAN) in the adversarial stage (Algorithms patch, gen, loss, disc, train)
+    keep the checkpoint with the best validation Dice;  segment fold k and the test set (Algorithm infer)
+aggregate per patient: metrics of the fold models on the test set are averaged;  out-of-fold metrics on the development set
+extract the 101 features from the out-of-fold masks;  train and evaluate the grade classifiers (Algorithm grade)
+compare variants: paired bootstrap intervals, Wilcoxon tests with Holm correction, effect sizes (Section stats)
+decide the hypotheses H1-H5 by the rules fixed in advance
+Output: tables, figures and verdicts generated from the output files
+@end
+
+@alg:pipeline summarises the order of the operations; the leak-free properties (no patient in two parts, statistics of the normalisation per case, model selection on the validation fold only) hold at every step.
+
+@section[prob-def] Formal Problem Definition
+
+@subsection Notation
+
+A case consists of an image tensor $\mathbf{x}\in\mathbb{R}^{4\times D\times H\times W}$ whose channels are the co-registered sequences T1, T1ce, T2 and FLAIR, a label volume $L\in\{0,1,2,4\}^{D\times H\times W}$ and, for the classification task, a grade $c\in\{0,1\}$ with $c=1$ for HGG. The voxel grid is denoted $\Omega$ and $N=|\Omega|$. A *region map* $\Phi$ converts the labels into three binary volumes:
+
+@eq region-map
+y_{\mathrm{WT}} = \mathbf{1}[L\in\{1,2,4\}], \qquad y_{\mathrm{TC}} = \mathbf{1}[L\in\{1,4\}], \qquad y_{\mathrm{ET}} = \mathbf{1}[L=4],
+@end
+
+with $\mathbf{y}=(y_{\mathrm{WT}},y_{\mathrm{TC}},y_{\mathrm{ET}})\in\{0,1\}^{3\times N}$. By construction $y_{\mathrm{ET}}\le y_{\mathrm{TC}}\le y_{\mathrm{WT}}$ voxel-wise. The segmentation network is a function $f_\theta$ that maps $\mathbf{x}$ to logits $\mathbf{z}\in\mathbb{R}^{3\times N}$; the probabilities are $\mathbf{p}=\sigma(\mathbf{z})$ with the element-wise logistic function $\sigma$, and the binary prediction is obtained by thresholding at $1/2$ followed by a projection onto the hierarchy,
+
+@eq hierarchy
+\hat{y}_{\mathrm{WT}}=\mathbf{1}[p_{\mathrm{WT}}>\tfrac12],\quad \hat{y}_{\mathrm{TC}}=\mathbf{1}[p_{\mathrm{TC}}>\tfrac12]\,\hat{y}_{\mathrm{WT}},\quad \hat{y}_{\mathrm{ET}}=\mathbf{1}[p_{\mathrm{ET}}>\tfrac12]\,\hat{y}_{\mathrm{TC}} .
+@end
+
+@subsection Learning and evaluation objectives
+
+Let $\mathcal{D}$ denote the distribution of patients. The *evaluation objective* is the expected score on a new patient,
+
+@eq eval-obj
+\mathcal{S}_m(\theta)=\mathbb{E}_{(\mathbf{x},L)\sim\mathcal{D}}\Big[m\big(\hat{y}_r(f_\theta(\mathbf{x})),\,y_r\big)\Big],\qquad r\in\{\mathrm{WT},\mathrm{TC},\mathrm{ET}\},
+@end
+
+for the metrics $m\in\{\mathrm{Dice},-\mathrm{HD95}\}$. Neither metric is differentiable (they depend on a threshold and, for HD95, on a percentile of distances), so the network is trained by minimising the empirical risk of a differentiable surrogate $\mathcal{L}$ on random patches,
+
+@eq erm
+\hat{\theta}=\arg\min_\theta \frac{1}{n}\sum_{k=1}^{n}\mathcal{L}\big(f_\theta(\mathbf{x}_k),\mathbf{y}_k\big),
+@end
+
+where the sum runs over the training patients only. The gap between $\mathcal{S}_m(\hat{\theta})$ and the surrogate objective on the training set is the generalisation gap that the evaluation protocol of Section @sec:eval-protocol is designed to measure without bias. The grade classifier is a function $g_\phi$ of a feature vector $\mathbf{u}=u(\mathbf{x},\hat{\mathbf{y}})$ computed from the *predicted* regions, and it estimates $\Pr(c=1\mid\mathbf{u})$; its evaluation objective is the area under the ROC curve on held-out patients.
+
+@section[data] Data and Preprocessing
+
+@subsection Data set and partitioning
+
+The experiments are specified on the 369 training cases of BraTS 2020 (293 HGG, 76 LGG); the grade of each case is read from the file *name_mapping.csv* distributed with the data. Images are used as provided by the organisers (co-registered, 1 mm isotropic, skull-stripped). The cases are partitioned at the *patient level* in a grade-stratified manner in two steps: a fraction of 20% of the cases of each grade is drawn as a held-out test set, and the remaining cases are distributed over $K=5$ cross-validation folds, again within each grade. With the grade counts above this gives a test set of 74 cases (59 HGG, 15 LGG) and folds of 58 to 60 cases. A fixed pseudo-random seed (42) makes the partition reproducible, and an assertion in the code verifies that the test set and the folds are pairwise disjoint (Section @sec:impl). For fold $k$, the network is trained on the other four folds, the fold $k$ is used for model selection, and the common test set is used only for the final evaluation. Because the test set is shared by all folds and all variants, paired comparisons are possible.
+
+@subsection Cropping and intensity normalisation
+
+Every volume is cropped to the bounding box of non-zero voxels dilated by a margin of four voxels. This removes empty background and does not use the label, so it is applicable at inference time. For each modality $m$, let $B=\{v:\exists m,\ x_m(v)\neq0\}$ be the brain mask. The intensities of modality $m$ inside $B$ are clipped to their 0.5th and 99.5th percentiles $[l_m,h_m]$ and standardised with the mean $\mu_m$ and standard deviation $\sigma_m$ of the clipped intensities:
+
+@eq norm
+\tilde{x}_m(v)=\frac{\min\{\max\{x_m(v),l_m\},h_m\}-\mu_m}{\sigma_m+10^{-8}}\ \ (v\in B),\qquad \tilde{x}_m(v)=0\ \ (v\notin B).
+@end
+
+The statistics are computed *per case and per modality*; no statistic is shared between cases, so that normalisation cannot leak information across the partitions. The preprocessed volumes are stored in half precision (images) and 8-bit integers (labels), together with up to 4,096 randomly drawn tumour-voxel coordinates per case that are used by the patch sampler.
+
+@fig preproc | file=figs/m_preproc.png | width=6.3
+The preprocessing chain illustrated on a synthetic phantom case ($96^3$ voxels): (a) the FLAIR volume with the crop box, (b) the cropped volume, (c) the volume after percentile clipping and in-brain standardisation, and (d)--(f) the intensity histograms before cropping, after clipping and after standardisation.
+@end
+
+@fig:preproc shows the three steps on a synthetic case, for which the numbers are exact: the bounding box reduces the volume from $96\times96\times96$ to $62\times54\times48$ voxels, the clipping thresholds are the 0.5th and 99.5th percentiles of the 49,672 brain voxels, and 498 voxels (1.0% of the brain) are clipped. After standardisation the in-brain mean is zero and the standard deviation is one. @alg:prep gives the complete procedure.
+
+@algo prep
+Preprocessing of one case (identical at training and inference time).
+Input: volumes x_1..x_4 (T1, T1ce, T2, FLAIR), optional label y
+B <- { v : x_m(v) != 0 for at least one m }                   # brain mask
+box <- bounding box of B, dilated by 4 voxels, clipped to the volume
+x_m <- x_m[box]  (m = 1..4);   y <- y[box];   B <- B[box]
+for m = 1 .. 4:
+    l_m, h_m <- 0.5th and 99.5th percentile of { x_m(v) : v in B }
+    c_m(v) <- min( max( x_m(v), l_m ), h_m )  for v in B
+    mu_m, sigma_m <- mean and standard deviation of { c_m(v) : v in B }
+    x~_m(v) <- ( c_m(v) - mu_m ) / ( sigma_m + 1e-8 )  for v in B;   x~_m(v) <- 0  for v not in B
+store x~ in half precision;  y in 8 bit;  up to 4096 random tumour-voxel coordinates
+Output: x~ (4 x D' x H' x W'), y, crop box (needed to paste the prediction back)
+@end
+
+@section[aug] Patch Sampling and Data Augmentation
+
+Training on whole volumes is infeasible within the memory of a single GPU, so the network is trained on patches of $128^3$ voxels with a batch size of two. Patches are sampled from a randomly drawn training patient. With probability $q=0.67$ the patch is centred at a randomly drawn tumour voxel plus a uniform jitter of up to $\pm16$ voxels per axis (*foreground-biased* sampling); otherwise its position is uniform over the cropped volume. Foreground bias raises the fraction of patches that contain the rare ET and TC voxels, which complements the imbalance-aware loss; at inference the whole brain is processed, so the bias affects only the training distribution.
+
+@fig patch | file=figs/m_patch.png | width=6.3
+Foreground-biased patch sampling on a synthetic volume ($96^3$ voxels, $48^3$ patches): (a) footprints of tumour-centred (red) and uniformly placed (blue) patches, (b) fraction of patches that contain tumour and (c) mean share of tumour voxels in a patch, for foreground probabilities $q\in\{0,0.33,0.67,1\}$ (500 patches each); (d) one sampled patch (contours of the three regions) and the effect of the random flips, of rotation and scaling, and of the intensity changes.
+@end
+
+@fig:patch quantifies the effect of the sampling probability on the phantom volume. With $q=0$ (uniform placement) 69.2% of the patches contain tumour and tumour voxels make up 3.6% of a patch on average; with the value $q=0.67$ used here the corresponding numbers are 89.2% and 12.1%, i.e. the share of foreground voxels the loss sees is more than three times larger. The proportions on BraTS differ because real tumours occupy a smaller fraction of the cropped brain, but the direction of the effect is the same. @alg:patch lists the sampling and augmentation steps in the order in which the code applies them.
+
+@algo patch
+Construction of one training batch.
+Input: preprocessed training cases, patch size P = 128, batch size B = 2, foreground probability q = 0.67, jitter J = 16
+for b = 1 .. B:
+    draw a case i uniformly from the training cases
+    with probability q:   v <- random tumour voxel of case i;   o <- v - P/2 + U{-J..J}^3
+    otherwise:            o <- U{0 .. size_i - P}^3
+    clamp o so that the patch lies inside the volume (zero-pad if the volume is smaller than P)
+    (x_b, y_b) <- crop of case i at origin o
+for each axis a in {D, H, W}:  flip the whole sample along a with probability 0.5
+for each sample:   with probability 0.2 draw rotation angles U(-15, 15) deg per axis
+                   with probability 0.2 draw a zoom factor U(0.85, 1.25)
+resample (x: trilinear, y: nearest neighbour) with the composed affine map
+for each sample:   with probability 0.1 add Gaussian noise, sigma ~ U(0, 0.1)
+    for each channel: with probability 0.15 each, apply brightness (x U(0.75, 1.25)),
+                      contrast (about the channel mean, x U(0.75, 1.25)), gamma (exponent U(0.7, 1.5))
+Output: augmented batch (x: B x 4 x P^3, y: B x 3 x P^3)
+@end
+
+Augmentation is applied on the GPU to the whole batch. @tab:aug lists the operations and their probabilities, which follow common practice for brain MRI [@shorten]. Spatial transforms are applied identically to the image and the label (nearest-neighbour interpolation for the label), intensity transforms to the image only.
+
+@tab aug | widths=1.6,2.2,1.4 | align=lll | size=9
+Data augmentation: operation, parameters and probability of application.
+| Operation | Parameters | Probability |
+| --- | --- | --- |
+| Mirroring | independently along each of the three axes | 0.5 per axis |
+| Rotation | angles $\sim\mathcal{U}(-15^\circ,15^\circ)$ about each axis | 0.2 |
+| Isotropic scaling | zoom factor $\sim\mathcal{U}(0.85,1.25)$ | 0.2 |
+| Gaussian noise | $\sigma\sim\mathcal{U}(0,0.1)$ (normalised units) | 0.1 |
+| Brightness | multiplicative factor $\sim\mathcal{U}(0.75,1.25)$, per channel | 0.15 |
+| Contrast | scaling about the channel mean, factor $\sim\mathcal{U}(0.75,1.25)$ | 0.15 |
+| Gamma | exponent $\sim\mathcal{U}(0.7,1.5)$ on the min--max scaled channel | 0.15 |
+@end
+
+@section[arch] Network Architecture
+
+@subsection Backbone: a residual encoder--decoder
+
+The generator $G=f_\theta$ is a three-dimensional encoder--decoder with five resolution levels $l=0,\dots,4$. The number of feature channels at level $l$ is
+
+@eq widths
+c_l=\min\{c_0\,2^{\,l},\,c_{\max}\},\qquad c_0=32,\ c_{\max}=320,\qquad (c_0,\dots,c_4)=(32,64,128,256,320).
+@end
+
+A *convolution unit* is a $3\times3\times3$ convolution without bias followed by instance normalisation [@instnorm] and a leaky rectifier with slope $0.01$ [@lrelu]. Instance normalisation, which normalises each channel of each case over its spatial extent,
+
+@eq instnorm
+\mathrm{IN}(u)_{c}=\gamma_c\,\frac{u_c-\mu_c(u)}{\sqrt{\sigma_c^2(u)+\varepsilon}}+\beta_c,
+@end
+
+is preferred to batch normalisation because the batch size of two makes batch statistics unreliable [@bn]. The encoder at level $l$ applies a *residual block* [@resnet],
+
+@eq resblock
+\mathbf{h}_{l}=\varphi\big(\mathcal{F}_l(\mathbf{h}_{l-1}')+\mathcal{S}_l(\mathbf{h}_{l-1}')\big),\qquad \mathcal{F}_l=\mathrm{IN}\circ\mathrm{Conv}_3\circ\varphi\circ\mathrm{IN}\circ\mathrm{Conv}_3,
+@end
+
+where $\varphi$ is the leaky rectifier and $\mathcal{S}_l$ is the identity or, when the channel number or the resolution changes, a $1\times1\times1$ convolution followed by instance normalisation. Down-sampling is performed by the stride-two convolution of the first unit of each block (levels one to four), not by pooling, so that the network learns its own anti-aliasing. The decoder at level $l<4$ up-samples the deeper feature map by a transposed convolution with kernel and stride two (a choice that avoids checkerboard artefacts, [@odena]), concatenates it with the (optionally gated) skip feature of the encoder, and applies a residual block with $c_l$ channels. The plain variant A0 of the ablation replaces residual blocks by two consecutive convolution units without skip connection inside the block.
+
+@fig blocks | file=figs/m_blocks.png | width=6.2
+The two building blocks of the generator: (a) the plain block of variant A0 and (b) the residual block of variants A1 to A5. The decoder uses the same blocks with stride one.
+@end
+
+@fig unet | file=figs/d_unet.png | width=6.2
+The generator: a five-level residual encoder--decoder with stride-two convolutions, transposed-convolution up-sampling, attention gates on the skip connections, an optional modality-attentive fusion stem and deep supervision heads at three resolutions.
+@end
+
+At the output, $1\times1\times1$ convolutions map the decoder features at level 0 to three logits $\mathbf{z}$ (WT, TC, ET). With deep supervision [@deepsup], two additional heads at levels 1 and 2 (resolutions 1/2 and 1/4) produce auxiliary logits $\mathbf{z}^{(1)},\mathbf{z}^{(2)}$ that are used during training only.
+
+@subsection Receptive field
+
+For a stack of layers with kernel sizes $k_l$ and strides $s_l$, define the cumulative stride ("jump") $j_l=\prod_{i\le l}s_i$ and the receptive field $r_l$ of a unit of layer $l$ with respect to the input by the recursion [@erf]
+
+@eq rf
+r_0=1,\quad j_0=1,\qquad r_l=r_{l-1}+(k_l-1)\,j_{l-1},\qquad j_l=j_{l-1}\,s_l .
+@end
+
+Applying the recursion to the encoder (two $3^3$ convolutions per level, stride two at the first convolution of levels one to four) gives the theoretical receptive fields listed in @tab:rf of Chapter 4: 95 voxels at the bottleneck (level 4) of the plain network and 97 voxels with the additional $3^3$ convolution of the MAF stem. At the 1 mm resolution of BraTS this is about 9.5 cm, i.e. roughly three quarters of the side of the $128^3$ training patch, to which the decoder adds a further, smaller extension. Two consequences follow. First, the network can integrate context over a substantial part of the brain but not over the whole head, so that the patch size matters: small patches would remove the context needed to decide, for example, whether a hypointense region is a necrotic core or a ventricle. Second, the *effective* receptive field, the region that actually influences a unit, is much smaller than the theoretical one and is concentrated near its centre [@erf]; predictions near the border of a patch are therefore less reliable than central ones, which motivates the Gaussian importance weighting of sliding-window inference (Section @sec:infer).
+
+@subsection Attention gates on the skip connections
+
+The skip connections transport encoder features to the decoder at full resolution. An additive attention gate [@attgated] re-weights the skip features $\mathbf{s}\in\mathbb{R}^{C\times D\times H\times W}$ at each voxel using a gating signal $\mathbf{g}$ taken from the up-sampled decoder features at the same resolution:
+
+@eq ag
+\mathbf{q}=\mathrm{ReLU}\big(W_s\mathbf{s}+W_g\mathbf{g}+\mathbf{b}_g\big),\qquad \alpha=\sigma\big(\boldsymbol{\psi}^{\top}\mathbf{q}+b_\psi\big)\in(0,1)^{D\times H\times W},\qquad \hat{\mathbf{s}}=\alpha\odot\mathbf{s},
+@end
+
+where $W_s,W_g$ are $1\times1\times1$ convolutions into $C/2$ intermediate channels, $\boldsymbol{\psi}$ is a $1\times1\times1$ convolution to a single channel and $\odot$ broadcasts the scalar attention coefficient $\alpha(v)$ over the channels. Each gate adds $C^2+C+1$ trainable parameters ($W_s$ and $W_g$ contribute $C^2/2$ weights each, plus $C/2$ bias terms for $W_g$, $C/2$ weights for $\boldsymbol{\psi}$ and one bias).
+
+@fig attgate | file=figs/d_attgate.png | width=5.2
+Additive attention gate: the skip feature $\mathbf{s}$ and the gating signal $\mathbf{g}$ are projected, added, rectified and mapped to a spatial coefficient map that rescales $\mathbf{s}$ before concatenation.
+@end
+
+**Proposition 1 (gradient attenuation).** Let $\mathcal{L}$ be a loss that depends on the skip feature only through $\hat{\mathbf{s}}=\alpha\odot\mathbf{s}$, write $u(v)=\boldsymbol{\psi}^{\top}\mathbf{q}(v)+b_\psi$ so that $\alpha(v)=\sigma(u(v))$, and let $G(v)=\sum_{c'}s_{c'}(v)\,\partial\mathcal{L}/\partial\hat{s}_{c'}(v)$. Then for every voxel $v$ and channel $c$,
+
+@eq ag-grad
+\frac{\partial\mathcal{L}}{\partial s_c(v)}=\alpha(v)\,\frac{\partial\mathcal{L}}{\partial\hat{s}_c(v)}+\alpha(v)\big(1-\alpha(v)\big)\,G(v)\,\kappa_c(v),\qquad \kappa_c(v)=\sum_{k}\psi_k\,\mathbf{1}[q_k(v)>0]\,(W_s)_{kc}.
+@end
+
+*Proof.* Apply the chain rule to $\hat{s}_c(v)=\alpha(v)s_c(v)$: the direct path contributes $\alpha(v)\,\partial\mathcal{L}/\partial\hat{s}_c(v)$; the path through the coefficient contributes $G(v)\,\partial\alpha(v)/\partial s_c(v)$ with $\partial\alpha/\partial u=\alpha(1-\alpha)$ and $\partial u/\partial s_c=\kappa_c$, because $\mathbf{q}$ depends on $\mathbf{s}$ through $W_s$ and the rectifier passes only the positive components. $\square$
+
+*Consequence.* In voxels where the decoder context indicates background, the gate saturates at $\alpha(v)\to0$. Both terms of the gradient then vanish: the direct term is multiplied by $\alpha(v)$ and the indirect term by $\alpha(v)(1-\alpha(v))$. The weights of the encoder are therefore updated predominantly by the voxels that the decoder deems relevant, which acts as a learned, soft spatial mask on the gradients as well as on the features. This property also marks the limitation of the gate: if the gate closes on a true tumour voxel early in training, the gradient that would correct the mistake is itself attenuated. The thesis therefore exports the coefficient maps $\alpha$ of trained models and inspects them (Chapter 4), and the ablation compares the gated network with the ungated one under an identical training recipe, so that a harmful gate would show up as a negative effect.
+
+@subsection Modality-attentive fusion
+
+In the plain (early-fusion) variant, the four modalities enter the first convolution as input channels. The modality-attentive fusion (MAF) stem processes each modality separately and weights the modalities per feature channel according to the case. For modality $m\in\{1,\dots,M\}$, $M=4$, a modality-specific unit with $C_s$ channels (here $C_s=\max\{c_0/2,4\}=16$) computes
+
+@eq maf-stem
+\mathbf{f}_m=\varphi\big(\mathrm{IN}(\mathrm{Conv}_3^{(m)}(x_m))\big)\in\mathbb{R}^{C_s\times D\times H\times W},\qquad \mathbf{d}_m=\frac{1}{N}\sum_{v}\mathbf{f}_m(v)\in\mathbb{R}^{C_s}.
+@end
+
+A multi-layer perceptron shared across the modalities maps each descriptor $\mathbf{d}_m$ to scores $\mathbf{e}_m=W_2\,\mathrm{ReLU}(W_1\mathbf{d}_m+\mathbf{b}_1)+\mathbf{b}_2\in\mathbb{R}^{C_s}$, and the weights are a softmax across the modalities, separately for each channel $c$:
+
+@eq maf-weights
+a_{m,c}=\frac{\exp(e_{m,c})}{\sum_{m'=1}^{M}\exp(e_{m',c})},\qquad \sum_{m=1}^{M}a_{m,c}=1,\qquad \mathbf{f}_{\mathrm{fuse}}=\sum_{m=1}^{M}\mathbf{a}_m\odot\mathbf{f}_m .
+@end
+
+The stem output is $\mathrm{out}=\varphi\big(\mathrm{IN}(W_{\mathrm{mix}}[\mathbf{f}_{\mathrm{fuse}};\mathbf{f}_1;\dots;\mathbf{f}_M])\big)$ with a $1\times1\times1$ convolution $W_{\mathrm{mix}}:\mathbb{R}^{C_s(M+1)}\to\mathbb{R}^{c_0}$. Concatenating the individual maps keeps the modality-specific information that a convex combination would discard, while the fused map provides a case-adaptive summary.
+
+@fig maf | file=figs/d_maf.png | width=5.8
+Modality-attentive fusion stem: per-modality feature extraction, global pooling, a shared scoring network, a per-channel softmax across modalities and a mixing convolution.
+@end
+
+*Properties.* (i) *Convexity:* by construction $a_{m,c}\ge0$ and $\sum_m a_{m,c}=1$, so $\mathbf{f}_{\mathrm{fuse}}$ is a convex combination of the stems and its scale is bounded by the largest of them. (ii) *Reduction to mean fusion:* if the scores are equal for all modalities (for example, when $W_2=0$), then $a_{m,c}=1/M$ and the module reduces to an average of the stems. (iii) *Case adaptivity:* the weights depend on the global statistics of each case and are constant over space; they can therefore represent, for example, an unusually low-contrast FLAIR acquisition, but not a spatially varying preference. (iv) *Sensitivity:* the Jacobian of the softmax is $\partial a_{m,c}/\partial e_{k,c}=a_{m,c}(\delta_{mk}-a_{k,c})$, which vanishes when one modality dominates, so that a collapsed weighting is a stable fixed point that must be monitored; the weights $a_{m,c}$ are therefore exported and visualised in Chapter 4.
+
+@subsection Complexity
+
+The number of trainable parameters of a convolution without bias is $k^3C_{\mathrm{in}}C_{\mathrm{out}}$, and its number of multiply-accumulate operations (MACs) on an output of $V$ voxels is $k^3C_{\mathrm{in}}C_{\mathrm{out}}V$. Summing over all layers gives the totals for the model, which are obtained *exactly* in the implementation by registering hooks on all convolutional and linear layers and running a forward pass on the meta device (no memory allocation), so that they hold for the implemented architecture and are not estimates. Because $V$ shrinks by a factor of eight with each down-sampling, the highest-resolution levels dominate the computational cost while the deepest levels dominate the parameter count: the parameter count grows with the square of $c_l$, and $c_l$ doubles per level up to the cap of 320 channels. The values are reported in @tab:cx of Chapter 4.
+
+@algo gen
+Forward pass of the generator G (variant A5; the other variants omit the marked steps).
+Input: x (B x 4 x D x H x W);  levels l = 0 .. 4 with widths c = (32, 64, 128, 256, 320)
+[MAF] for m = 1..4:  f_m <- LeakyReLU( IN( Conv3( x_m ) ) )                 # per-modality stem, 16 channels
+[MAF] d_m <- spatial mean of f_m;   e_m <- MLP( d_m );   a <- softmax over m of e (per channel)
+[MAF] x <- LeakyReLU( IN( Conv1( concat( sum_m a_m * f_m, f_1, ..., f_4 ) ) ) )     # 32 channels
+for l = 0 .. 4:                                              # encoder
+    x <- ResBlock_l( x )        (stride 2 in the first convolution when l >= 1)
+    s_l <- x
+h <- s_4
+for l = 3 .. 0:                                              # decoder
+    u <- ConvTranspose( h )                                  # kernel 2, stride 2, c_l channels
+    [AG] s <- s_l * sigmoid( psi( ReLU( W_x s_l + W_g u ) ) )           # attention gate, Eq. (ag)
+    h <- ResBlock( concat( u, s ) )                          # c_l channels
+    if l <= 2 and training:  z^(l) <- Conv1( h )             # deep-supervision heads
+z^(0) <- Conv1( h )                                          # full-resolution logits (WT, TC, ET)
+Output: z^(0) at inference;  [z^(0), z^(1), z^(2)] during training
+@end
+
+@tab shapes | widths=1.55,1.55,1.5,1.0 | align=lllr | size=8.5
+Tensor shapes and trainable parameters of the generator A5 for an input patch of $128^3$ voxels (exact values from the implementation; the sum of the rows equals the total of the model, 16,965,317 parameters, of which the four attention gates contribute 1,057, 4,161, 16,513 and 65,793).
+| Module | Input | Output | Parameters |
+| --- | --- | --- | --- |
+| MAF stem | $4\times128^3$ | $32\times128^3$ | 4,760 |
+| Encoder level 0 | $32\times128^3$ | $32\times128^3$ | 55,424 |
+| Encoder level 1 | $32\times128^3$ | $64\times64^3$ | 168,320 |
+| Encoder level 2 | $64\times64^3$ | $128\times32^3$ | 672,512 |
+| Encoder level 3 | $128\times32^3$ | $256\times16^3$ | 2,688,512 |
+| Encoder level 4 | $256\times16^3$ | $320\times8^3$ | 5,060,480 |
+| Decoder level 3 | $512\times16^3$ (concat.) | $256\times16^3$ | 6,162,433 |
+| Decoder level 2 | $256\times32^3$ (concat.) | $128\times32^3$ | 1,639,425 |
+| Decoder level 1 | $128\times64^3$ (concat.) | $64\times64^3$ | 410,113 |
+| Decoder level 0 | $64\times128^3$ (concat.) | $32\times128^3$ | 102,657 |
+| Output heads (3) | levels 0, 1, 2 | 3 $\times$ (full, 1/2, 1/4) | 681 |
+@end
+
+@alg:gen follows the code line by line, and @tab:shapes lists the shape of the tensor at every stage. The parameter count is dominated by the deepest encoder level and the first decoder level (together 66% of the 16.97 million parameters), as expected from the quadratic growth of the weight count with the channel number, whereas the attention gates (87,524 parameters in total) and the MAF stem (4,760) add less than 1% to the model.
+
+@section[losses] Loss Functions
+
+@subsection Region-based formulation
+
+Let $p_{r,i}=\sigma(z_{r,i})$ be the predicted probability of voxel $i$ for region $r$ and $t_{r,i}\in\{0,1\}$ the target. For each region, the soft confusion counts are computed jointly over the batch and over space:
+
+@eq soft-counts
+\mathrm{TP}_r=\sum_i p_{r,i}t_{r,i},\qquad \mathrm{FP}_r=\sum_i p_{r,i}(1-t_{r,i}),\qquad \mathrm{FN}_r=\sum_i (1-p_{r,i})\,t_{r,i}.
+@end
+
+Summation over the batch ("batch Dice") rather than per sample avoids the instability of a per-sample ratio when a patch contains no foreground of a region (the denominator would then vanish), at the price that large tumours weigh more than small ones in a batch. The three losses of the framework are
+
+@eq loss-dice
+\mathcal{L}_{\mathrm{Dice}}=1-\frac13\sum_{r}\frac{2\,\mathrm{TP}_r+\epsilon}{2\,\mathrm{TP}_r+\mathrm{FP}_r+\mathrm{FN}_r+\epsilon},\qquad
+\mathcal{L}_{\mathrm{TV}}=1-\frac13\sum_{r}\frac{\mathrm{TP}_r+\epsilon}{\mathrm{TP}_r+\alpha\,\mathrm{FP}_r+\beta\,\mathrm{FN}_r+\epsilon},
+@end
+
+@eq loss-bce
+\mathcal{L}_{\mathrm{BCE}}=-\frac{1}{3N_b}\sum_{r,i}\Big[t_{r,i}\log p_{r,i}+(1-t_{r,i})\log(1-p_{r,i})\Big],
+@end
+
+with $\epsilon=10^{-5}$ and $N_b$ the number of voxels in the batch. The Tversky loss uses $(\alpha,\beta)=(0.3,0.7)$ by default, so that $\alpha$ weights false positives and $\beta$ false negatives; $\alpha=\beta=\tfrac12$ recovers the Dice loss. The *segmentation loss* of one output is $\mathcal{L}_{\mathrm{seg}}=w_{\mathrm{D}}\mathcal{L}_{\mathrm{Dice}}+w_{\mathrm{T}}\mathcal{L}_{\mathrm{TV}}+w_{\mathrm{B}}\mathcal{L}_{\mathrm{BCE}}$, all weights being one in the full model and $w_{\mathrm{T}}=0$ in variants A0 to A3. With deep supervision the total is the weighted sum over the three outputs,
+
+@eq loss-ds
+\mathcal{L}_{\mathrm{seg}}^{\mathrm{DS}}=\sum_{i=0}^{2}w_i\,\mathcal{L}_{\mathrm{seg}}\big(\mathbf{z}^{(i)},\mathbf{t}^{(i)}\big),\qquad w_i=\frac{2^{-i}}{\sum_{j=0}^{2}2^{-j}}=\Big(\tfrac47,\tfrac27,\tfrac17\Big),
+@end
+
+where $\mathbf{t}^{(i)}$ is the label down-sampled to the resolution of output $i$ by nearest-neighbour interpolation.
+
+@fig deepsup | file=figs/m_deepsup.png | width=6.2
+Deep supervision: each of the three decoder heads is trained against the region masks at its own resolution; the three segmentation losses are combined with the weights $4/7$, $2/7$ and $1/7$. Only the full-resolution head is used at inference.
+@end
+
+@algo loss
+Segmentation loss of one training batch.
+Input: logits z^(0), z^(1), z^(2); region targets t (B x 3 x P^3); alpha = 0.3, beta = 0.7
+w <- (4/7, 2/7, 1/7);   L <- 0
+for i = 0, 1, 2:
+    t_i <- t  if i = 0  else nearest-neighbour down-sampling of t to the size of z^(i)
+    p <- sigmoid( z^(i) )
+    for each region r in {WT, TC, ET}:
+        TP <- sum( p * t_i );   FP <- sum( p * (1 - t_i) );   FN <- sum( (1 - p) * t_i )      # over batch and space
+        dice_r <- (2 TP + eps) / (2 TP + FP + FN + eps)
+        tv_r   <- (TP + eps) / (TP + alpha FP + beta FN + eps)
+    L_Dice <- 1 - mean_r dice_r;   L_TV <- 1 - mean_r tv_r;   L_BCE <- binary cross-entropy (mean over all voxels and regions)
+    L <- L + w_i * ( L_Dice + L_TV + L_BCE )                 # L_TV is omitted in variants A0-A3
+Output: L_seg^DS = L
+@end
+
+@alg:loss makes the computation explicit. The sums run over the whole batch, so that a patch without a given region does not produce an undefined ratio, and the Tversky term is simply left out in the variants without it.
+
+@subsection Gradients of the Dice loss and the imbalance problem
+
+To see why overlap losses suit imbalanced data, consider a single region and write $S=\sum_i p_i+\sum_i t_i=2\mathrm{TP}+\mathrm{FP}+\mathrm{FN}$. For the soft Dice $D=(2\mathrm{TP}+\epsilon)/(S+\epsilon)$ one has $\partial\mathrm{TP}/\partial p_i=t_i$ and $\partial S/\partial p_i=1$, and therefore
+
+@eq dice-grad
+\frac{\partial\mathcal{L}_{\mathrm{Dice}}}{\partial p_i}=-\frac{\partial D}{\partial p_i}=
+\begin{cases}
+\dfrac{2\,\mathrm{TP}+\epsilon}{(S+\epsilon)^2}>0, & t_i=0,\\[3mm]
+-\dfrac{2(S+\epsilon)-(2\,\mathrm{TP}+\epsilon)}{(S+\epsilon)^2}<0, & t_i=1 .
+\end{cases}
+@end
+
+Two facts follow. First, the gradient with respect to $p_i$ is *the same for all voxels of a class*, whatever their current probability; the voxel-specific factor enters only through the chain rule to the logit, $\partial p_i/\partial z_i=p_i(1-p_i)$. Second, consider the idealised case of an (almost) empty prediction, $p\approx0$ everywhere, for which $\mathrm{TP}\approx0$ and $S\approx N_t$ with $N_t$ the number of tumour voxels. Each tumour voxel receives the gradient $-2/N_t$, so the *total* gradient mass on the tumour is
+
+@eq dice-mass
+\sum_{i:\,t_i=1}\Big|\frac{\partial\mathcal{L}_{\mathrm{Dice}}}{\partial p_i}\Big|\;\approx\;N_t\cdot\frac{2}{N_t}=2,
+@end
+
+*independently of the tumour size* in this limit, whereas the background receives practically no gradient ($\propto\mathrm{TP}\approx0$). When the predicted background probabilities do not vanish, $S$ also contains $\sum_i p_i$ and the foreground gradient mass decreases, but it remains far larger than that of the cross-entropy at small tumour fractions (Section @sec:v2). For the cross-entropy, the gradient with respect to the logit is $(p_i-t_i)/N_b$, so the total mass on the tumour is $\sum_{t_i=1}(1-p_i)/N_b\approx N_t/N_b$, i.e. it shrinks in proportion to the tumour fraction. This is the quantitative content of the statement that the overlap losses are insensitive to the class imbalance, and it is verified numerically in Chapter 4. The price is the scale $1/S$ of the gradient: when the target is tiny, so is $S$, and the gradients become large and noisy, which is why the Dice loss is combined with the cross-entropy, whose gradients are bounded by $1/N_b$ per voxel, and why gradient-norm clipping is used in training.
+
+@subsection The Tversky loss and the recall--precision trade-off
+
+For the Tversky index $T=(\mathrm{TP}+\epsilon)/(\mathrm{TP}+\alpha\mathrm{FP}+\beta\mathrm{FN}+\epsilon)$ write $\mathcal{D}'=\mathrm{TP}+\alpha\mathrm{FP}+\beta\mathrm{FN}+\epsilon=(1-\alpha-\beta)\mathrm{TP}+\alpha\sum_ip_i+\beta\sum_it_i+\epsilon$. Differentiating gives
+
+@eq tv-grad
+\frac{\partial\mathcal{L}_{\mathrm{TV}}}{\partial p_i}=
+\begin{cases}
+\dfrac{\alpha\,(\mathrm{TP}+\epsilon)}{\mathcal{D}'^{\,2}}, & t_i=0,\\[3mm]
+-\dfrac{\alpha\,\mathrm{FP}+\beta\,\mathrm{FN}+\beta\,(\mathrm{TP}+\epsilon)}{\mathcal{D}'^{\,2}}, & t_i=1 .
+\end{cases}
+@end
+
+The effect of the asymmetry is clearest at the level of the error counts. Treating $\mathrm{TP}$, $\mathrm{FP}$ and $\mathrm{FN}$ as independent variables, the marginal costs of an additional false positive and of an additional false negative are $\partial\mathcal{L}_{\mathrm{TV}}/\partial\mathrm{FP}=\alpha\,\mathrm{TP}/\mathcal{D}'^2$ and $\partial\mathcal{L}_{\mathrm{TV}}/\partial\mathrm{FN}=\beta\,\mathrm{TP}/\mathcal{D}'^2$, so
+
+@eq cost-ratio
+\frac{\partial\mathcal{L}_{\mathrm{TV}}/\partial\mathrm{FN}}{\partial\mathcal{L}_{\mathrm{TV}}/\partial\mathrm{FP}}=\frac{\beta}{\alpha}\qquad\Big(=\tfrac{7}{3}\approx2.33\ \text{for }(\alpha,\beta)=(0.3,0.7)\Big).
+@end
+
+A missed tumour voxel is thus penalised 2.33 times more than a spurious one, whereas the Dice loss is symmetric (ratio one). For $\alpha+\beta=1$ the Tversky index is exactly an F-measure. Indeed the F$_\gamma$ score $\mathrm{F}_\gamma=(1+\gamma^2)\mathrm{TP}/\big((1+\gamma^2)\mathrm{TP}+\gamma^2\mathrm{FN}+\mathrm{FP}\big)$ equals $\mathrm{TP}/(\mathrm{TP}+\alpha\mathrm{FP}+\beta\mathrm{FN})$ with
+
+@eq tv-fbeta
+\alpha=\frac{1}{1+\gamma^2},\qquad \beta=\frac{\gamma^2}{1+\gamma^2},\qquad\text{i.e.}\quad \gamma=\sqrt{\beta/\alpha}.
+@end
+
+With $(\alpha,\beta)=(0.3,0.7)$ one obtains $\gamma=\sqrt{7/3}\approx1.53$: the loss optimises a recall-weighted F-measure that counts recall about 1.53 times as heavily as precision (in the sense of the F$_\gamma$ family). The asymmetry is deliberately mild; the sensitivity experiments include $(0.2,0.8)$ and the symmetric limit $(0.5,0.5)$. The analysis suggests the following prediction, which is tested as hypothesis H2: relative to the symmetric loss, the asymmetric loss increases sensitivity (recall) of the thresholded predictions and lowers their precision.
+
+@subsection Relation between Dice and IoU
+
+Because the Dice score $d$ and the IoU $j$ of a single case are related by $j=d/(2-d)$, a function that is strictly convex on $[0,1]$ ($j''(d)=4/(2-d)^3>0$) and bounded above by the identity ($j(d)\le d$ with equality only at $d\in\{0,1\}$), the means of the two scores over a set of cases are not related by the same function. Jensen's inequality gives, for the mean Dice $\bar d$ and mean IoU $\bar j$ over any set of cases,
+
+@eq dice-iou
+\frac{\bar d}{2-\bar d}\;\le\;\bar j\;\le\;\bar d ,
+@end
+
+with equality on the left if and only if all cases have the same Dice score, and on the right only if every case has Dice 0 or 1. The pair $(\bar d,\bar j)$ is therefore feasible if and only if it lies in the region delimited by these bounds (@fig:v1 of Chapter 4). The relation is used in this thesis as a *consistency check* on every reported pair of mean Dice and mean IoU: for example, a mean Dice of 0.99 requires a mean IoU of at least $0.99/1.01=0.980$.
